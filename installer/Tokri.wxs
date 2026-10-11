@@ -12,7 +12,8 @@
            Scope="perUser"
            Compressed="yes">
 
-    <MajorUpgrade DowngradeErrorMessage="En nyare version av Tokri är redan installerad." />
+    <MajorUpgrade AllowSameVersionUpgrades="yes"
+                  DowngradeErrorMessage="En nyare version av Tokri är redan installerad." />
     <MediaTemplate EmbedCab="yes" />
 
     <Icon Id="TokriIcon" SourceFile="$(var.IconFile)" />

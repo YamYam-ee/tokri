@@ -720,7 +720,7 @@ void TokriWindow::setupTabs()
     };
 
     // Load tabs (the first, id 0, is the original Tokri folder).
-    QSettings settings;
+    QSettings settings("Tokri", "Tokri"); // registry: HKCU/Software/Tokri/Tokri
     const int n = settings.beginReadArray("tabs");
     for (int i = 0; i < n; ++i) {
         settings.setArrayIndex(i);
@@ -729,6 +729,24 @@ void TokriWindow::setupTabs()
     settings.endArray();
     if (mTabs.isEmpty())
         mTabs.append({0, QStringLiteral("Korg")});
+
+    // Tab folders with files that the list doesn't know about (e.g. the
+    // list was lost) come back as tabs, so nothing ends up hidden.
+    const QDir tabsRoot(QDir::home().filePath("Tokri-flikar"));
+    const QStringList folders = tabsRoot.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+    for (const QString &folder : folders) {
+        bool ok = false;
+        const int id = folder.toInt(&ok);
+        if (!ok || id <= 0)
+            continue;
+        const bool known = std::any_of(mTabs.cbegin(), mTabs.cend(),
+                                       [id](const BasketTab &t) { return t.id == id; });
+        const bool hasFiles = !QDir(tabsRoot.filePath(folder))
+                                   .isEmpty(QDir::AllEntries | QDir::NoDotAndDotDot | QDir::Hidden);
+        if (!known && hasFiles)
+            mTabs.append({id, QStringLiteral("Flik %1").arg(id)});
+    }
+
     for (const BasketTab &t : std::as_const(mTabs))
         mNextTabId = qMax(mNextTabId, t.id + 1);
 
@@ -740,6 +758,7 @@ void TokriWindow::setupTabs()
             qBound(0, settings.value("tabs/current").toInt(), int(mTabs.size()) - 1));
     }
     StandardPaths::setBasketDir(currentBasketDir());
+    saveTabs();
 
     connect(mTabBar, &QTabBar::currentChanged, this, &TokriWindow::onTabChanged);
     connect(mTabBar, &QTabBar::tabMoved, this, [this](int from, int to) {
@@ -791,7 +810,7 @@ QString TokriWindow::currentBasketDir() const
 
 void TokriWindow::saveTabs() const
 {
-    QSettings settings;
+    QSettings settings("Tokri", "Tokri"); // registry: HKCU/Software/Tokri/Tokri
     settings.beginWriteArray("tabs", int(mTabs.size()));
     for (int i = 0; i < mTabs.size(); ++i) {
         settings.setArrayIndex(i);

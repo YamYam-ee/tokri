@@ -413,7 +413,7 @@ void PreviewDialog::sizeForAspect(qreal aspect, int extraWidth)
     // comfortably fits, so a whole page is visible at its proper width.
     static bool loaded = false;
     if (!loaded) {
-        sUserCenter = QSettings().value("preview/center").toPoint();
+        sUserCenter = QSettings("Tokri", "Tokri").value("preview/center").toPoint();
         loaded = true;
     }
 
@@ -602,7 +602,7 @@ void PreviewDialog::rememberIfMoved()
     const QPoint c = geometry().center();
     if ((c - mPlacedCenter).manhattanLength() > 8) {
         sUserCenter = c;
-        QSettings().setValue("preview/center", c);
+        QSettings("Tokri", "Tokri").setValue("preview/center", c);
     }
 }
 
