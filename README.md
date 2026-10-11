@@ -9,6 +9,8 @@ Det här är en vidareutveckling av [Tokri](https://github.com/ysuraj1999/tokri)
 av Suraj Yadav, med ett antal funktioner för vardagligt dokumentarbete på
 Windows. Originalets README finns i [docs/UPSTREAM-README.md](docs/UPSTREAM-README.md).
 
+**[📖 Användarguide med bilder](https://yamyam-ee.github.io/tokri/)** – så använder du alla funktioner.
+
 ## Ladda ner
 
 **[⬇ Senaste versionen (MSI)](../../releases/latest)** – dubbelklicka på
@@ -58,7 +60,7 @@ Windows. Originalets README finns i [docs/UPSTREAM-README.md](docs/UPSTREAM-READ
 ## Klona och bygga
 
 ```bash
-git clone https://github.com/OWNER/tokri.git
+git clone https://github.com/YamYam-ee/tokri.git
 ```
 
 Krav (Windows):
