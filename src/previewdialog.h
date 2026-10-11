@@ -6,8 +6,7 @@
 #include <QPointer>
 #include <QString>
 
-class QLabel;
-class QPushButton;
+class NavButton;
 class ShellPreviewHost;
 
 // Quick-look style window for one file: images and text are shown directly;
@@ -34,6 +33,11 @@ protected:
     void keyPressEvent(QKeyEvent *e) override;
     void closeEvent(QCloseEvent *e) override;
     bool eventFilter(QObject *watched, QEvent *e) override;
+    void moveEvent(QMoveEvent *e) override;
+    void resizeEvent(QResizeEvent *e) override;
+    void showEvent(QShowEvent *e) override;
+    void hideEvent(QHideEvent *e) override;
+    void changeEvent(QEvent *e) override;
 
 private:
     QWidget *makeImageView(const QImage &image);
@@ -45,15 +49,19 @@ private:
     void removeClickToClose();
     void rememberIfMoved();
     void closeOnClick(QWidget *w);
+    void placeNavButtons();
 
     static QPointer<PreviewDialog> sCurrent;
     static QPoint sUserCenter;  // where the user last moved a preview to
     QPoint mPlacedCenter;
 
     QWidget *mContent = nullptr;
-    QPushButton *mPrev = nullptr;
-    QPushButton *mNext = nullptr;
-    QLabel *mPosition = nullptr;
+    NavButton *mPrev = nullptr;
+    NavButton *mNext = nullptr;
+    QString mFileName;
+    QString mPositionText;
+    bool mHasPrev = false;
+    bool mHasNext = false;
     QPoint mPressPos;
 };
 

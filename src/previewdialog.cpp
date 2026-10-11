@@ -14,9 +14,11 @@
 #include <QMouseEvent>
 #include <QLabel>
 #include <QMimeDatabase>
-#include <QHBoxLayout>
 #include <QPlainTextEdit>
-#include <QPushButton>
+#include <QEnterEvent>
+#include <QPainter>
+#include <functional>
+#include <QPainterPath>
 #include <QResizeEvent>
 #include <QScreen>
 #include <QSettings>
@@ -173,6 +175,87 @@ QImage shellThumbnail(const QString &path, int size)
 
 #endif
 
+// Big, very transparent previous/next arrow floating over the left or right
+// edge of the preview; clearly visible while hovered. It is its own
+// frameless translucent window so it can float above native document
+// previews too (child widgets cannot be transparent over those).
+class NavButton : public QWidget
+{
+public:
+    NavButton(bool forward, QWidget *owner)
+        : QWidget(owner, Qt::Tool | Qt::FramelessWindowHint
+                             | Qt::WindowDoesNotAcceptFocus
+                             | Qt::NoDropShadowWindowHint)
+        , mForward(forward)
+    {
+        setAttribute(Qt::WA_TranslucentBackground);
+        setAttribute(Qt::WA_ShowWithoutActivating);
+        setCursor(Qt::PointingHandCursor);
+        setFixedSize(64, 128);
+        setToolTip(forward ? QStringLiteral("Nästa fil (nedåt i listan)")
+                           : QStringLiteral("Föregående fil (uppåt i listan)"));
+    }
+
+    std::function<void()> onClick;
+
+protected:
+    void paintEvent(QPaintEvent *) override
+    {
+        QPainter p(this);
+        p.setRenderHint(QPainter::Antialiasing);
+
+        const QRectF r = QRectF(rect()).adjusted(2, 2, -2, -2);
+        p.setPen(Qt::NoPen);
+        p.setBrush(QColor(0, 0, 0, mHover ? (mPressed ? 170 : 130) : 35));
+        p.drawRoundedRect(r, 14, 14);
+
+        // Chevron
+        const qreal cx = r.center().x(), cy = r.center().y();
+        const qreal dx = 10, dy = 20;
+        QPainterPath chevron;
+        if (mForward) {
+            chevron.moveTo(cx - dx / 2, cy - dy);
+            chevron.lineTo(cx + dx, cy);
+            chevron.lineTo(cx - dx / 2, cy + dy);
+        } else {
+            chevron.moveTo(cx + dx / 2, cy - dy);
+            chevron.lineTo(cx - dx, cy);
+            chevron.lineTo(cx + dx / 2, cy + dy);
+        }
+        p.setBrush(Qt::NoBrush);
+        p.setPen(QPen(QColor(255, 255, 255, mHover ? 255 : 80), 5,
+                      Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        p.drawPath(chevron);
+    }
+
+    void enterEvent(QEnterEvent *) override { mHover = true; update(); }
+    void leaveEvent(QEvent *) override { mHover = mPressed = false; update(); }
+
+    void mousePressEvent(QMouseEvent *e) override
+    {
+        if (e->button() == Qt::LeftButton) {
+            mPressed = true;
+            update();
+        }
+    }
+
+    void mouseReleaseEvent(QMouseEvent *e) override
+    {
+        if (e->button() != Qt::LeftButton)
+            return;
+        const bool fire = mPressed && rect().contains(e->position().toPoint());
+        mPressed = false;
+        update();
+        if (fire && onClick)
+            onClick();
+    }
+
+private:
+    bool mForward;
+    bool mHover = false;
+    bool mPressed = false;
+};
+
 PreviewDialog::PreviewDialog(QWidget *parent)
     : QDialog(parent)
 {
@@ -183,37 +266,70 @@ PreviewDialog::PreviewDialog(QWidget *parent)
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
 
-    // Bottom bar: [◀ Föregående]   3 / 12   [Nästa ▶]
-    auto *bar = new QWidget(this);
-    auto *h = new QHBoxLayout(bar);
-    h->setContentsMargins(8, 4, 8, 4);
-    mPrev = new QPushButton(QStringLiteral("◀  Föregående"), bar);
-    mNext = new QPushButton(QStringLiteral("Nästa  ▶"), bar);
-    mPosition = new QLabel(bar);
-    mPosition->setAlignment(Qt::AlignCenter);
-    for (QPushButton *b : {mPrev, mNext}) {
-        b->setFocusPolicy(Qt::NoFocus);
-        b->setAutoDefault(false);
-        b->setCursor(Qt::PointingHandCursor);
-    }
-    mPrev->setToolTip(QStringLiteral("Föregående fil (uppåt i listan)"));
-    mNext->setToolTip(QStringLiteral("Nästa fil (nedåt i listan)"));
-    h->addWidget(mPrev);
-    h->addStretch();
-    h->addWidget(mPosition);
-    h->addStretch();
-    h->addWidget(mNext);
-    layout->addWidget(bar);
-
-    connect(mPrev, &QPushButton::clicked, this, [this] { emit navigateRequested(-1); });
-    connect(mNext, &QPushButton::clicked, this, [this] { emit navigateRequested(+1); });
+    mPrev = new NavButton(false, this);
+    mNext = new NavButton(true, this);
+    mPrev->onClick = [this] { emit navigateRequested(-1); };
+    mNext->onClick = [this] { emit navigateRequested(+1); };
 }
 
 void PreviewDialog::setNavigation(int position, int count)
 {
-    mPosition->setText(QStringLiteral("%1 / %2").arg(position).arg(count));
-    mPrev->setEnabled(position > 1);
-    mNext->setEnabled(position < count);
+    mPositionText = QStringLiteral("%1 / %2").arg(position).arg(count);
+    setWindowTitle(mFileName + QStringLiteral("   —   ") + mPositionText);
+    mHasPrev = position > 1;
+    mHasNext = position < count;
+    placeNavButtons();
+}
+
+void PreviewDialog::placeNavButtons()
+{
+    if (!mPrev || !mNext)
+        return;
+    const bool visible = isVisible() && !isMinimized();
+    const QRect area(mapToGlobal(QPoint(0, 0)), size());
+    const int margin = 12;
+    const int y = area.center().y() - mPrev->height() / 2;
+
+    mPrev->move(area.left() + margin, y);
+    mNext->move(area.right() - margin - mNext->width() + 1, y);
+    mPrev->setVisible(visible && mHasPrev);
+    mNext->setVisible(visible && mHasNext);
+    if (visible) {
+        mPrev->raise();
+        mNext->raise();
+    }
+}
+
+void PreviewDialog::moveEvent(QMoveEvent *e)
+{
+    QDialog::moveEvent(e);
+    placeNavButtons();
+}
+
+void PreviewDialog::resizeEvent(QResizeEvent *e)
+{
+    QDialog::resizeEvent(e);
+    placeNavButtons();
+}
+
+void PreviewDialog::showEvent(QShowEvent *e)
+{
+    QDialog::showEvent(e);
+    placeNavButtons();
+}
+
+void PreviewDialog::hideEvent(QHideEvent *e)
+{
+    mPrev->hide();
+    mNext->hide();
+    QDialog::hideEvent(e);
+}
+
+void PreviewDialog::changeEvent(QEvent *e)
+{
+    QDialog::changeEvent(e);
+    if (e->type() == QEvent::WindowStateChange)
+        placeNavButtons();
 }
 
 void PreviewDialog::closeOnClick(QWidget *w)
@@ -313,8 +429,7 @@ void PreviewDialog::sizeForAspect(qreal aspect, int extraWidth)
         scr = parentWidget() ? parentWidget()->screen() : screen();
     const QRect avail = scr->availableGeometry();
 
-    // The page area excludes the navigation bar at the bottom.
-    const int barH = mPrev ? mPrev->parentWidget()->sizeHint().height() : 0;
+    const int barH = 0;
     int pageH = int(avail.height() * 0.88) - barH;
     int w = int(pageH * aspect) + extraWidth;
     const int maxW = int(avail.width() * 0.95);
@@ -340,7 +455,8 @@ void PreviewDialog::showFile(const QString &path)
     log.push("preview");
 
     const QFileInfo fi(path);
-    setWindowTitle(fi.fileName());
+    mFileName = fi.fileName();
+    setWindowTitle(mFileName);
 
     // Only one preview at a time.
     if (sCurrent && sCurrent != this)
