@@ -358,7 +358,25 @@ void TokriWindow::previewIndex(const QModelIndex &index)
 
     // Reuse an open preview so it stays where it is while browsing.
     if (!mPreview) {
+        // New preview session: remember where it started.
+        mPreviewStartIndex = index;
+        view->setPreviewStart(QModelIndex());
+
         mPreview = new PreviewDialog(this);
+        // However it is closed (click, X, Esc): select the file last shown
+        // and tone the row the session started from.
+        connect(mPreview, &QObject::destroyed, this, [this, view] {
+            if (mPreviewIndex.isValid()) {
+                view->selectionModel()->setCurrentIndex(
+                    mPreviewIndex, QItemSelectionModel::ClearAndSelect);
+                view->scrollTo(mPreviewIndex);
+            }
+            if (mPreviewStartIndex.isValid()
+                && mPreviewStartIndex != mPreviewIndex)
+                view->setPreviewStart(mPreviewStartIndex);
+            activateWindow();
+            view->setFocus();
+        });
         connect(mPreview, &PreviewDialog::navigateRequested, this,
                 [this, view](int delta) {
                     if (!mPreviewIndex.isValid())

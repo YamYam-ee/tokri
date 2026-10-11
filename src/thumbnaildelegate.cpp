@@ -1,5 +1,6 @@
 #include "thumbnaildelegate.h"
 
+#include "nointernaldraglistview.h"
 #include "sortfilterproxy.h"
 #include "thumbnaillayout.h"
 
@@ -39,6 +40,21 @@ void ThumbnailDelegate::paint(QPainter *painter,
     // selection still shows through.
     if (delivered)
         painter->fillRect(opt.rect, QColor(0x2e, 0xa0, 0x43, selected ? 130 : 210));
+
+    // Where the last preview session started: a toned-down selection with a
+    // thin accent bar on the left.
+    if (!selected) {
+        const auto *view = qobject_cast<const NoInternalDragListView *>(opt.widget);
+        if (view && view->previewStart() == index) {
+            QColor tone = opt.palette.color(QPalette::Highlight);
+            tone.setAlpha(75);
+            painter->fillRect(opt.rect, tone);
+            tone.setAlpha(200);
+            painter->fillRect(QRect(opt.rect.left(), opt.rect.top(), 3,
+                                    opt.rect.height()),
+                              tone);
+        }
+    }
 
     // Strong hover: a highlight wash plus an accent bar and outline, so the
     // row under the mouse is unmistakable (also on green rows).

@@ -5,6 +5,7 @@
 #include <QObject>
 #include <QPainter>
 #include <QItemSelectionModel>
+#include <QPersistentModelIndex>
 
 class NoInternalDragListView : public QListView
 {
@@ -13,6 +14,11 @@ public:
     using QListView::QListView;
 
     NoInternalDragListView();
+
+    // Row where the last preview session started; drawn with a toned
+    // selection until the user clicks in the list again.
+    void setPreviewStart(const QModelIndex &index);
+    QModelIndex previewStart() const { return mPreviewStart; }
 
 protected:
     void startDrag(Qt::DropActions supportedActions) override;
@@ -44,6 +50,7 @@ private:
 
     int mLastVisibleCount = -1;
     int mDropRow = -1;
+    QPersistentModelIndex mPreviewStart;
     bool mDroppedOnSelf = false;
 };
 

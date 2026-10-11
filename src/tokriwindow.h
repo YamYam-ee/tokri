@@ -55,6 +55,7 @@ private:
     QWidget *mBottomBar = nullptr;
     QPointer<PreviewDialog> mPreview;
     QPersistentModelIndex mPreviewIndex;
+    QPersistentModelIndex mPreviewStartIndex;
 
     void init();
     void applyColumnSizing();

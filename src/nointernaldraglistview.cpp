@@ -32,6 +32,14 @@ void preferCopy(QDropEvent *e)
 
 NoInternalDragListView::NoInternalDragListView() {}
 
+void NoInternalDragListView::setPreviewStart(const QModelIndex &index)
+{
+    if (QModelIndex(mPreviewStart) == index)
+        return;
+    mPreviewStart = index;
+    viewport()->update();
+}
+
 void NoInternalDragListView::startDrag(Qt::DropActions supportedActions)
 {
     Q_UNUSED(supportedActions);
@@ -272,6 +280,8 @@ void NoInternalDragListView::leaveEvent(QEvent *e)
 
 void NoInternalDragListView::mousePressEvent(QMouseEvent *e)
 {
+    setPreviewStart(QModelIndex());
+
     // Clicking the tick of a delivered row un-ticks it.
     if (e->button() == Qt::LeftButton && e->modifiers() == Qt::NoModifier) {
         const QPoint pos = e->position().toPoint();
