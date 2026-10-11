@@ -40,6 +40,24 @@ void ThumbnailDelegate::paint(QPainter *painter,
     if (delivered)
         painter->fillRect(opt.rect, QColor(0x2e, 0xa0, 0x43, selected ? 130 : 210));
 
+    // Strong hover: a highlight wash plus an accent bar and outline, so the
+    // row under the mouse is unmistakable (also on green rows).
+    if (opt.state & QStyle::State_MouseOver) {
+        QColor accent(0x3d, 0x9b, 0xff);
+        QColor wash = accent;
+        wash.setAlpha(delivered ? 90 : 120);
+        painter->fillRect(opt.rect, wash);
+
+        painter->save();
+        accent.setAlpha(255);
+        painter->setPen(QPen(accent, 1));
+        painter->drawRect(opt.rect.adjusted(0, 0, -1, -1));
+        painter->fillRect(QRect(opt.rect.left(), opt.rect.top(), 4,
+                                opt.rect.height()),
+                          accent);
+        painter->restore();
+    }
+
     const QRect cell = opt.rect.adjusted(ListHorizontalPadding, 0,
                                          -ListHorizontalPadding, 0);
     int x = cell.x();
