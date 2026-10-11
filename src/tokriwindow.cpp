@@ -2,7 +2,9 @@
 #include "./ui_tokriwindow.h"
 #include "dropawarefilesystemmodel.h"
 #include "filereveal.h"
+#include "basketorder.h"
 #include "loghelpers.h"
+#include "previewdialog.h"
 #include "sortfilterproxy.h"
 #include "standardpaths.h"
 #include "thumbnaildelegate.h"
@@ -11,6 +13,7 @@
 #include <QHBoxLayout>
 #include <QMenu>
 #include <QPushButton>
+#include <QShortcut>
 #include <QCloseEvent>
 #include <QDesktopServices>
 #include <QFile>
@@ -83,7 +86,19 @@ TokriWindow::TokriWindow(QWidget *parent)
     clearButton->setFocusPolicy(Qt::NoFocus);
     connect(clearButton, &QPushButton::clicked, this, &TokriWindow::clearAll);
     bar->addWidget(clearButton);
+
+    auto *previewButton = new QPushButton("Förhandsvisa", mBottomBar);
+    previewButton->setToolTip("Snabbtitt på markerad fil (Mellanslag)");
+    previewButton->setFocusPolicy(Qt::NoFocus);
+    connect(previewButton, &QPushButton::clicked, this,
+            &TokriWindow::previewSelection);
+    bar->addWidget(previewButton);
     bar->addStretch();
+
+    auto *previewShortcut = new QShortcut(QKeySequence(Qt::Key_Space), ui->listView);
+    previewShortcut->setContext(Qt::WidgetShortcut);
+    connect(previewShortcut, &QShortcut::activated, this,
+            &TokriWindow::previewSelection);
 
     mCounter = new QLabel(mBottomBar);
     mCounter->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
@@ -112,8 +127,20 @@ TokriWindow::TokriWindow(QWidget *parent)
                 QAction *open = nullptr, *reveal = nullptr, *rename = nullptr;
                 QAction *copy = nullptr, *del = nullptr, *selectAll = nullptr;
                 QAction *paste = nullptr;
+                QAction *preview = nullptr, *tick = nullptr, *untick = nullptr;
+
+                int deliveredCount = 0;
+                for (const QModelIndex &idx : selected)
+                    if (idx.data(FSSortFilterProxy::DeliveredRole).toBool())
+                        ++deliveredCount;
 
                 if (count > 0) {
+                    preview = menu.addAction("Förhandsvisa\tMellanslag");
+                    if (deliveredCount > 0)
+                        untick = menu.addAction("Ta bort bock");
+                    if (deliveredCount < count)
+                        tick = menu.addAction("Bocka av");
+                    menu.addSeparator();
                     open = menu.addAction("&Open");
                     copy = menu.addAction("&Copy");
 #ifdef Q_OS_WIN
@@ -149,6 +176,18 @@ TokriWindow::TokriWindow(QWidget *parent)
                 auto fileInfoAt = [](const QModelIndex &idx) {
                     return idx.data(QFileSystemModel::FileInfoRole).value<QFileInfo>();
                 };
+
+                if (chosen == preview) {
+                    previewSelection();
+                    log.pop();
+                    return;
+                }
+
+                if (chosen == tick || chosen == untick) {
+                    setSelectionDelivered(chosen == tick);
+                    log.pop();
+                    return;
+                }
 
                 if (chosen == paste) {
                     emit pasteRequested();
@@ -290,6 +329,34 @@ void TokriWindow::updateCounter()
                           .arg(total == 1 ? "fil" : "filer")
                           .arg(delivered));
     mBottomBar->setEnabled(true);
+}
+
+void TokriWindow::previewSelection()
+{
+    auto *view = ui->listView;
+    QModelIndex idx = view->currentIndex();
+    if (!idx.isValid() || !view->selectionModel()->isSelected(idx)) {
+        const auto selected = view->selectionModel()->selectedIndexes();
+        if (selected.isEmpty())
+            return;
+        idx = selected.first();
+    }
+
+    const QFileInfo fi =
+        idx.data(QFileSystemModel::FileInfoRole).value<QFileInfo>();
+    auto *dlg = new PreviewDialog(this);
+    dlg->showFile(fi.absoluteFilePath());
+}
+
+void TokriWindow::setSelectionDelivered(bool delivered)
+{
+    QStringList names;
+    const auto selected = ui->listView->selectionModel()->selectedIndexes();
+    for (const QModelIndex &idx : selected)
+        names << idx.data(QFileSystemModel::FileInfoRole).value<QFileInfo>().fileName();
+    BasketOrder::instance().setDelivered(names, delivered);
+    if (delivered)
+        ui->listView->clearSelection();
 }
 
 void TokriWindow::clearAll()

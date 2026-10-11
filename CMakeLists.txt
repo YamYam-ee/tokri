@@ -82,6 +82,7 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         src/thumbnaildelegate.h src/thumbnaildelegate.cpp
         src/thumbnaillayout.h
         src/basketorder.h src/basketorder.cpp
+        src/previewdialog.h src/previewdialog.cpp
         src/nointernaldraglistview.h src/nointernaldraglistview.cpp
         src/standardnames.h
         src/shakedetector.h src/shakedetector.cpp
@@ -185,6 +186,8 @@ if(WIN32)
     target_link_libraries(Tokri PRIVATE
         user32
         ole32
+        shell32
+        shlwapi
     )
 endif()
 

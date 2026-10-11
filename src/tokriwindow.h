@@ -38,6 +38,8 @@ public slots:
     void fitHeightToContents();
     void updateCounter();
     void clearAll();
+    void previewSelection();
+    void setSelectionDelivered(bool delivered);
 
 signals:
     void pasteRequested();

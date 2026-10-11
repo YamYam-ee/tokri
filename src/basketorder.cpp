@@ -61,11 +61,16 @@ void BasketOrder::addBatch(qint64 key, const QStringList &fileNames)
 
 void BasketOrder::markDelivered(const QStringList &fileNames)
 {
+    setDelivered(fileNames, true);
+}
+
+void BasketOrder::setDelivered(const QStringList &fileNames, bool delivered)
+{
     bool changed = false;
     for (const QString &name : fileNames) {
         Entry &e = mEntries[name];
-        if (!e.delivered) {
-            e.delivered = true;
+        if (e.delivered != delivered) {
+            e.delivered = delivered;
             changed = true;
         }
     }
@@ -74,6 +79,15 @@ void BasketOrder::markDelivered(const QStringList &fileNames)
 
     save();
     emit deliveredChanged();
+}
+
+void BasketOrder::setManualOrder(const QStringList &fileNames)
+{
+    for (int i = 0; i < fileNames.size(); ++i)
+        mEntries[fileNames[i]].batch = i;
+
+    save();
+    emit orderChanged();
 }
 
 void BasketOrder::rename(const QString &oldName, const QString &newName)

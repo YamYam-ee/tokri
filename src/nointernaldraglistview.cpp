@@ -2,6 +2,8 @@
 
 #include "basketorder.h"
 #include "loghelpers.h"
+#include "sortfilterproxy.h"
+#include "thumbnaillayout.h"
 
 #include <QDrag>
 #include <QDragEnterEvent>
@@ -9,8 +11,14 @@
 #include <QFileSystemModel>
 #include <QGuiApplication>
 #include <QMouseEvent>
+#include <QPainter>
 
 namespace {
+
+QString nameOf(const QModelIndex &idx)
+{
+    return idx.data(QFileSystemModel::FileInfoRole).value<QFileInfo>().fileName();
+}
 
 void preferCopy(QDropEvent *e)
 {
@@ -54,16 +62,20 @@ void NoInternalDragListView::startDrag(Qt::DropActions supportedActions)
     if (!icon.isNull())
         drag->setPixmap(icon.pixmap(iconSize(), devicePixelRatioF()));
 
+    mDroppedOnSelf = false;
     const Qt::DropAction result = drag->exec(Qt::CopyAction, Qt::CopyAction);
-    log.log() << "result=" << result;
+    log.log() << "result=" << result << "onSelf=" << mDroppedOnSelf;
 
-    if (result != Qt::IgnoreAction) {
+    // Dropping back into the list only reorders; anywhere else delivers.
+    if (result != Qt::IgnoreAction && !mDroppedOnSelf) {
         QStringList names;
         for (const QModelIndex &idx : std::as_const(indexes))
-            names << idx.data(QFileSystemModel::FileInfoRole)
-                         .value<QFileInfo>().fileName();
+            names << nameOf(idx);
         BasketOrder::instance().markDelivered(names);
+        // Deselect so the green "delivered" row is visible right away.
+        clearSelection();
     }
+    mDroppedOnSelf = false;
 
     log.pop();
 }
@@ -86,9 +98,12 @@ NoInternalDragListView::selectionCommand(const QModelIndex &index,
 void NoInternalDragListView::dragEnterEvent(QDragEnterEvent *e)
 {
     const bool isSelf = e->source() == this;
-    if (isSelf)
-        e->ignore();
-    else {
+    if (isSelf) {
+        // Reordering within the list.
+        e->setDropAction(Qt::CopyAction);
+        e->accept();
+        setDropRow(dropRowAt(e->position().toPoint()));
+    } else {
         emit dropping(true);
         QListView::dragEnterEvent(e);
         preferCopy(e);
@@ -98,9 +113,12 @@ void NoInternalDragListView::dragEnterEvent(QDragEnterEvent *e)
 void NoInternalDragListView::dragMoveEvent(QDragMoveEvent *e)
 {
     const bool isSelf = e->source() == this;
-    if (isSelf)
-        e->ignore();
-    else {
+    if (isSelf) {
+        QListView::dragMoveEvent(e); // keeps auto-scroll near the edges
+        e->setDropAction(Qt::CopyAction);
+        e->accept();
+        setDropRow(dropRowAt(e->position().toPoint()));
+    } else {
         QListView::dragMoveEvent(e);
         preferCopy(e);
     }
@@ -113,6 +131,7 @@ void NoInternalDragListView::dragLeaveEvent(QDragLeaveEvent *e)
     log.log() << "leave";
 
     emit dropping(false);
+    setDropRow(-1);
 
     QListView::dragLeaveEvent(e);
 
@@ -130,6 +149,17 @@ void NoInternalDragListView::dropEvent(QDropEvent *e)
               << "formats=" << e->mimeData()->formats();
     emit dropping(false);
 
+    if (e->source() == this) {
+        const int row = dropRowAt(e->position().toPoint());
+        setDropRow(-1);
+        mDroppedOnSelf = true;
+        e->setDropAction(Qt::CopyAction);
+        e->accept();
+        moveSelectionTo(row);
+        log.pop();
+        return;
+    }
+
     e->setDropAction(Qt::CopyAction);
 
     QListView::dropEvent(e);
@@ -138,6 +168,104 @@ void NoInternalDragListView::dropEvent(QDropEvent *e)
               << "finalDropAction=" << e->dropAction();
 
     log.pop();
+}
+
+int NoInternalDragListView::dropRowAt(const QPoint &pos) const
+{
+    const int rows = model() ? model()->rowCount(rootIndex()) : 0;
+    const QModelIndex idx = indexAt(pos);
+    if (!idx.isValid())
+        return rows;
+    const QRect r = visualRect(idx);
+    return pos.y() < r.center().y() ? idx.row() : idx.row() + 1;
+}
+
+void NoInternalDragListView::setDropRow(int row)
+{
+    if (row == mDropRow)
+        return;
+    mDropRow = row;
+    viewport()->update();
+}
+
+void NoInternalDragListView::moveSelectionTo(int row)
+{
+    auto *m = model();
+    if (!m)
+        return;
+
+    const QModelIndex root = rootIndex();
+    const int rows = m->rowCount(root);
+
+    QStringList order;
+    for (int r = 0; r < rows; ++r)
+        order << nameOf(m->index(r, 0, root));
+
+    // Selected items, in their current top-to-bottom order.
+    QList<int> selectedRows;
+    const auto selected = selectionModel()->selectedIndexes();
+    for (const QModelIndex &idx : selected)
+        if (idx.parent() == root)
+            selectedRows << idx.row();
+    std::sort(selectedRows.begin(), selectedRows.end());
+    if (selectedRows.isEmpty())
+        return;
+
+    QStringList moved;
+    int insertAt = row;
+    for (int r : std::as_const(selectedRows)) {
+        moved << order[r];
+        if (r < row)
+            --insertAt;
+    }
+    for (const QString &name : std::as_const(moved))
+        order.removeOne(name);
+
+    insertAt = qBound(0, insertAt, int(order.size()));
+    for (int i = 0; i < moved.size(); ++i)
+        order.insert(insertAt + i, moved[i]);
+
+    Logger::instance().log() << "reorder moved=" << moved << "to=" << insertAt;
+    BasketOrder::instance().setManualOrder(order);
+}
+
+bool NoInternalDragListView::hitsTick(const QModelIndex &index,
+                                      const QPoint &pos) const
+{
+    using namespace ThumbnailLayout;
+
+    if (!index.isValid()
+        || !index.data(FSSortFilterProxy::DeliveredRole).toBool())
+        return false;
+    const QRect r = visualRect(index);
+    const int tickWidth = fontMetrics().height() + 2 * ListHorizontalPadding + 4;
+    return pos.x() >= r.right() - tickWidth;
+}
+
+void NoInternalDragListView::mousePressEvent(QMouseEvent *e)
+{
+    // Clicking the tick of a delivered row un-ticks it.
+    if (e->button() == Qt::LeftButton && e->modifiers() == Qt::NoModifier) {
+        const QPoint pos = e->position().toPoint();
+        const QModelIndex idx = indexAt(pos);
+        if (hitsTick(idx, pos)) {
+            BasketOrder::instance().setDelivered({nameOf(idx)}, false);
+            e->accept();
+            return;
+        }
+    }
+    QListView::mousePressEvent(e);
+}
+
+void NoInternalDragListView::mouseMoveEvent(QMouseEvent *e)
+{
+    if (e->buttons() == Qt::NoButton) {
+        const QPoint pos = e->position().toPoint();
+        const bool onTick = hitsTick(indexAt(pos), pos);
+        viewport()->setCursor(onTick ? Qt::PointingHandCursor : Qt::ArrowCursor);
+        setToolTip(onTick ? QStringLiteral("Klicka för att ta bort bocken") : QString());
+    }
+    QListView::mouseMoveEvent(e);
 }
 
 void NoInternalDragListView::emitVisibleCount()
@@ -159,6 +287,25 @@ void NoInternalDragListView::paintEvent(QPaintEvent *e) {
     emitVisibleCount();
 
     QListView::paintEvent(e);
+
+    // Insertion line while reordering by drag.
+    if (mDropRow >= 0 && model()) {
+        const int rows = model()->rowCount(rootIndex());
+        int y = 0;
+        if (rows > 0 && mDropRow < rows)
+            y = visualRect(model()->index(mDropRow, 0, rootIndex())).top();
+        else if (rows > 0)
+            y = visualRect(model()->index(rows - 1, 0, rootIndex())).bottom() + 1;
+
+        QPainter lp(viewport());
+        lp.setRenderHint(QPainter::Antialiasing);
+        const QColor c = palette().color(QPalette::Highlight).lighter(170);
+        const int yy = qBound(3, y, viewport()->height() - 3);
+        lp.setPen(QPen(c, 3, Qt::SolidLine, Qt::RoundCap));
+        lp.drawLine(10, yy, viewport()->width() - 6, yy);
+        lp.setBrush(c);
+        lp.drawEllipse(QPoint(7, yy), 4, 4);
+    }
 
     auto *m = model();
     if (!m || m->rowCount(rootIndex()) > 0)

@@ -21,6 +21,8 @@ protected:
     void dragLeaveEvent(QDragLeaveEvent *e) override;
     void dropEvent(QDropEvent *e) override;
     void paintEvent(QPaintEvent *e) override;
+    void mousePressEvent(QMouseEvent *e) override;
+    void mouseMoveEvent(QMouseEvent *e) override;
     QItemSelectionModel::SelectionFlags selectionCommand(
         const QModelIndex &index, const QEvent *event = nullptr) const override;
 
@@ -30,8 +32,15 @@ signals:
 
 private:
     void emitVisibleCount();
+    // Row the dragged items would be inserted before (rowCount = at the end).
+    int dropRowAt(const QPoint &pos) const;
+    bool hitsTick(const QModelIndex &index, const QPoint &pos) const;
+    void moveSelectionTo(int row);
+    void setDropRow(int row);
 
     int mLastVisibleCount = -1;
+    int mDropRow = -1;
+    bool mDroppedOnSelf = false;
 };
 
 #endif // NOINTERNALDRAGLISTVIEW_H
