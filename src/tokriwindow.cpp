@@ -3,6 +3,7 @@
 #include "dropawarefilesystemmodel.h"
 #include "filereveal.h"
 #include "loghelpers.h"
+#include "sortfilterproxy.h"
 #include "standardpaths.h"
 #include "thumbnaildelegate.h"
 #include "thumbnaillayout.h"
@@ -69,6 +70,12 @@ TokriWindow::TokriWindow(QWidget *parent)
     ui->listView->setFocusPolicy(Qt::StrongFocus);
     ui->listView->setDropIndicatorShown(false);
     ui->listView->setContextMenuPolicy(Qt::CustomContextMenu);
+
+    // "12 filer · 5 avbockade" under the list.
+    mCounter = new QLabel(ui->centralwidget);
+    mCounter->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    mCounter->setContentsMargins(4, 2, 4, 0);
+    ui->verticalLayout->addWidget(mCounter);
 
     applyColumnSizing();
 
@@ -239,6 +246,33 @@ void TokriWindow::applyColumnSizing()
 {
     setMinimumWidth(ThumbnailLayout::ListMinWidth);
     resize(ThumbnailLayout::ListDefaultWidth, height());
+}
+
+void TokriWindow::updateCounter()
+{
+    auto *view = ui->listView;
+    auto *m = view->model();
+    if (!m || !mCounter)
+        return;
+
+    const QModelIndex root = view->rootIndex();
+    const int total = m->rowCount(root);
+    int delivered = 0;
+    for (int r = 0; r < total; ++r)
+        if (m->index(r, 0, root).data(FSSortFilterProxy::DeliveredRole).toBool())
+            ++delivered;
+
+    if (total == 0) {
+        mCounter->clear();
+        mCounter->hide();
+        return;
+    }
+
+    mCounter->setText(QString("%1 %2  ·  %3 avbockade")
+                          .arg(total)
+                          .arg(total == 1 ? "fil" : "filer")
+                          .arg(delivered));
+    mCounter->show();
 }
 
 void TokriWindow::fitHeightToContents()

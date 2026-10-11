@@ -43,9 +43,9 @@ void ThumbnailDelegate::paint(QPainter *painter,
     // Strong hover: a highlight wash plus an accent bar and outline, so the
     // row under the mouse is unmistakable (also on green rows).
     if (opt.state & QStyle::State_MouseOver) {
-        QColor accent(0x3d, 0x9b, 0xff);
+        QColor accent = opt.palette.color(QPalette::Highlight);
         QColor wash = accent;
-        wash.setAlpha(delivered ? 90 : 120);
+        wash.setAlpha(delivered ? 70 : 110);
         painter->fillRect(opt.rect, wash);
 
         painter->save();

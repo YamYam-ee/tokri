@@ -283,7 +283,10 @@ int main(int argc, char *argv[])
     QObject::connect(&basketOrder, &BasketOrder::orderChanged,
                      sortFilterProxy, &QSortFilterProxyModel::invalidate);
     QObject::connect(&basketOrder, &BasketOrder::deliveredChanged,
-                     listView, [listView] { listView->viewport()->update(); });
+                     listView, [listView, &tokriWindow] {
+                         listView->viewport()->update();
+                         tokriWindow.updateCounter();
+                     });
     QObject::connect(fsModel, &QFileSystemModel::fileRenamed,
                      &basketOrder, [&basketOrder](const QString &,
                                                   const QString &oldName,
@@ -293,6 +296,7 @@ int main(int argc, char *argv[])
     // New items land at the bottom; grow the window and bring them into view.
     const auto fitAndScroll = [&tokriWindow, listView] {
         QTimer::singleShot(0, &tokriWindow, [&tokriWindow, listView] {
+            tokriWindow.updateCounter();
             tokriWindow.fitHeightToContents();
             listView->scrollToBottom();
         });

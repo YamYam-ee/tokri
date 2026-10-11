@@ -1,6 +1,7 @@
 #ifndef TOKRIWINDOW_H
 #define TOKRIWINDOW_H
 
+#include <QLabel>
 #include <QListView>
 #include <QMainWindow>
 #include <QDragEnterEvent>
@@ -35,12 +36,14 @@ public slots:
     void openSelection();
     void selectAll();
     void fitHeightToContents();
+    void updateCounter();
 
 signals:
     void pasteRequested();
 
 private:
     Ui::TokriWindow *ui;
+    QLabel *mCounter = nullptr;
 
     void init();
     void applyColumnSizing();
