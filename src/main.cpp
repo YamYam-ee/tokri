@@ -1,6 +1,7 @@
 #include "dropawarefilesystemmodel.h"
 #include "drophandler.h"
 #include "aboutwindow.h"
+#include "basketorder.h"
 #include "helpwindow.h"
 #include "loghelpers.h"
 #include "logwindow.h"
@@ -246,7 +247,7 @@ int main(int argc, char *argv[])
     FSSortFilterProxy *sortFilterProxy = new FSSortFilterProxy(&tokriWindow);
     sortFilterProxy->setSourceModel(thumbnailProxy);
     sortFilterProxy->setDynamicSortFilter(true);
-    sortFilterProxy->sort(0, Qt::DescendingOrder);
+    sortFilterProxy->sort(0, Qt::AscendingOrder);
 
     QObject::connect(listView, &NoInternalDragListView::visibleCountChanged,
                      thumbnailProxy, &ThumbnailProxyModel::setVisibleCount);
@@ -273,7 +274,26 @@ int main(int argc, char *argv[])
 
     qRegisterMetaType<QMimeData *>("QMimeData*");
 
+    // Keep the basket ordered by drop batch and show delivered check marks.
+    BasketOrder &basketOrder = BasketOrder::instance();
+    QObject::connect(&basketOrder, &BasketOrder::orderChanged,
+                     sortFilterProxy, &QSortFilterProxyModel::invalidate);
+    QObject::connect(&basketOrder, &BasketOrder::deliveredChanged,
+                     listView, [listView] { listView->viewport()->update(); });
+    QObject::connect(fsModel, &QFileSystemModel::fileRenamed,
+                     &basketOrder, [&basketOrder](const QString &,
+                                                  const QString &oldName,
+                                                  const QString &newName) {
+                         basketOrder.rename(oldName, newName);
+                     });
+    // New items land at the bottom; bring them into view.
+    QObject::connect(sortFilterProxy, &QAbstractItemModel::rowsInserted,
+                     listView, [listView] { listView->scrollToBottom(); });
+
     DropHandler *dropHandler = new DropHandler;
+    QObject::connect(dropHandler, &DropHandler::stored,
+                     &basketOrder, &BasketOrder::addBatch,
+                     Qt::QueuedConnection);
     fsModel->setDropReceiver(dropHandler);
     Logger::instance().log() << "dropReceiver set handler="
                              << static_cast<const void *>(dropHandler);

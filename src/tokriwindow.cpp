@@ -16,7 +16,6 @@
 #include <QFrame>
 #include <QApplication>
 #include <QClipboard>
-#include <QScrollBar>
 #include <QUrl>
 
 #ifdef Q_OS_WIN
@@ -57,16 +56,13 @@ TokriWindow::TokriWindow(QWidget *parent)
                 openItem(filePath);
     });
 
-    ui->listView->setViewMode(QListView::IconMode);
-    ui->listView->setIconSize({ThumbnailLayout::ThumbnailSize,
-                               ThumbnailLayout::ThumbnailSize});
-    ui->listView->setGridSize(
-        {ThumbnailLayout::TileWidth,
-         ThumbnailLayout::TileHeight(ui->listView->fontMetrics().height())});
-    ui->listView->setFlow(QListView::LeftToRight);
-    ui->listView->setWrapping(true);
+    ui->listView->setViewMode(QListView::ListMode);
+    ui->listView->setIconSize({ThumbnailLayout::ListIconSize,
+                               ThumbnailLayout::ListIconSize});
+    ui->listView->setFlow(QListView::TopToBottom);
+    ui->listView->setWrapping(false);
     ui->listView->setUniformItemSizes(true);
-    ui->listView->setSpacing(8);
+    ui->listView->setSpacing(0);
     ui->listView->setMouseTracking(true);
     ui->listView->setFocusPolicy(Qt::StrongFocus);
     ui->listView->setDropIndicatorShown(false);
@@ -237,18 +233,8 @@ void TokriWindow::init()
 
 void TokriWindow::applyColumnSizing()
 {
-    using namespace ThumbnailLayout;
-
-    int left = 0, top = 0, right = 0, bottom = 0;
-    ui->centralwidget->layout()->getContentsMargins(&left, &top,
-                                                    &right, &bottom);
-
-    const int scrollBar =
-        ui->listView->verticalScrollBar()->sizeHint().width();
-
-    const int width = MinViewportWidth + scrollBar + TileGap + left + right;
-    setMinimumWidth(width);
-    resize(width, height());
+    setMinimumWidth(ThumbnailLayout::ListMinWidth);
+    resize(ThumbnailLayout::ListDefaultWidth, height());
 }
 
 void TokriWindow::moveNearCursor()

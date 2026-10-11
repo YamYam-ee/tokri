@@ -1,4 +1,5 @@
 #include "sortfilterproxy.h"
+#include "basketorder.h"
 // #include <rapidfuzz/fuzz.hpp>
 
 #include <QFileSystemModel>
@@ -6,7 +7,20 @@
 
 FSSortFilterProxy::FSSortFilterProxy(QObject *parent)
     : QSortFilterProxyModel{parent}
-{}
+{
+    mCollator.setNumericMode(true);
+    mCollator.setCaseSensitivity(Qt::CaseInsensitive);
+}
+
+QVariant FSSortFilterProxy::data(const QModelIndex &index, int role) const
+{
+    if (role == DeliveredRole) {
+        const QFileInfo fi =
+            index.data(QFileSystemModel::FileInfoRole).value<QFileInfo>();
+        return BasketOrder::instance().isDelivered(fi.fileName());
+    }
+    return QSortFilterProxyModel::data(index, role);
+}
 
 bool FSSortFilterProxy::canDropMimeData(const QMimeData *data,
                                         Qt::DropAction action,
@@ -24,7 +38,20 @@ bool FSSortFilterProxy::lessThan(const QModelIndex &left, const QModelIndex &rig
 {
     const auto leftFileInfo = left.data(QFileSystemModel::FileInfoRole).value<QFileInfo>();
     const auto rightFileInfo = right.data(QFileSystemModel::FileInfoRole).value<QFileInfo>();
-    return leftFileInfo.birthTime() < rightFileInfo.birthTime();
+
+    // Items dropped together share a batch key; batches stay in the order
+    // they were dropped, and each batch is sorted by name ("2" before "10").
+    // Items without a recorded batch fall back to their creation time.
+    const auto key = [](const QFileInfo &fi) {
+        const qint64 batch = BasketOrder::instance().batchKey(fi.fileName());
+        return batch >= 0 ? batch : fi.birthTime().toMSecsSinceEpoch();
+    };
+    const qint64 l = key(leftFileInfo);
+    const qint64 r = key(rightFileInfo);
+    if (l != r)
+        return l < r;
+    return mCollator.compare(leftFileInfo.fileName(),
+                             rightFileInfo.fileName()) < 0;
 
     // if (mSearch.isEmpty()){
     // }

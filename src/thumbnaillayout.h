@@ -6,6 +6,13 @@
 namespace ThumbnailLayout {
 
 inline constexpr int ThumbnailSize = 128;
+
+// Compact list mode
+inline constexpr int ListIconSize = 24;
+inline constexpr int ListRowPadding = 3;
+inline constexpr int ListHorizontalPadding = 6;
+inline constexpr int ListMinWidth = 280;
+inline constexpr int ListDefaultWidth = 340;
 inline constexpr int ColumnCount = 3;
 inline constexpr int CaptionLineCount = 3;
 inline constexpr int TileGap = 8;

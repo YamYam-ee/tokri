@@ -1,8 +1,12 @@
 #include "nointernaldraglistview.h"
 
+#include "basketorder.h"
 #include "loghelpers.h"
 
+#include <QDrag>
 #include <QDragEnterEvent>
+#include <QFileInfo>
+#include <QFileSystemModel>
 #include <QGuiApplication>
 #include <QMouseEvent>
 
@@ -22,17 +26,46 @@ NoInternalDragListView::NoInternalDragListView() {}
 
 void NoInternalDragListView::startDrag(Qt::DropActions supportedActions)
 {
-    const Qt::KeyboardModifiers mods = QGuiApplication::keyboardModifiers();
-#ifdef Q_OS_MACOS
-    const bool copy = mods.testFlag(Qt::AltModifier);
-    if (copy) {
-        supportedActions = Qt::CopyAction;
+    Q_UNUSED(supportedActions);
+    Logger &log = Logger::instance();
+    log.push("startDrag");
+
+    // Items are always copied out, so they stay in the basket until deleted.
+    // A completed drop marks them as delivered.
+    QModelIndexList indexes;
+    const auto selected = selectionModel()->selectedIndexes();
+    for (const QModelIndex &idx : selected)
+        if (idx.isValid() && (model()->flags(idx) & Qt::ItemIsDragEnabled))
+            indexes << idx;
+    if (indexes.isEmpty()) {
+        log.pop();
+        return;
     }
-#else
-    const bool copy = mods.testFlag(Qt::ControlModifier);
-#endif
-    setDefaultDropAction(copy ? Qt::CopyAction : Qt::MoveAction);
-    QListView::startDrag(supportedActions);
+
+    QMimeData *mime = model()->mimeData(indexes);
+    if (!mime) {
+        log.pop();
+        return;
+    }
+
+    auto *drag = new QDrag(this);
+    drag->setMimeData(mime);
+    const QIcon icon = indexes.first().data(Qt::DecorationRole).value<QIcon>();
+    if (!icon.isNull())
+        drag->setPixmap(icon.pixmap(iconSize(), devicePixelRatioF()));
+
+    const Qt::DropAction result = drag->exec(Qt::CopyAction, Qt::CopyAction);
+    log.log() << "result=" << result;
+
+    if (result != Qt::IgnoreAction) {
+        QStringList names;
+        for (const QModelIndex &idx : std::as_const(indexes))
+            names << idx.data(QFileSystemModel::FileInfoRole)
+                         .value<QFileInfo>().fileName();
+        BasketOrder::instance().markDelivered(names);
+    }
+
+    log.pop();
 }
 
 QItemSelectionModel::SelectionFlags
@@ -109,14 +142,11 @@ void NoInternalDragListView::dropEvent(QDropEvent *e)
 
 void NoInternalDragListView::emitVisibleCount()
 {
-    const QSize grid = gridSize();
-    if (grid.isEmpty())
+    const int rowHeight = sizeHintForRow(0);
+    if (rowHeight <= 0)
         return;
 
-    const QSize vp = viewport()->size();
-    const int cols = vp.width() / grid.width() + 1;
-    const int rows = vp.height() / grid.height() + 1;
-    const int count = cols * rows;
+    const int count = viewport()->height() / rowHeight + 1;
 
     if (count == mLastVisibleCount)
         return;

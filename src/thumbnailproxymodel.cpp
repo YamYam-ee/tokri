@@ -19,8 +19,8 @@ constexpr int TotalCacheBytes = 32 * 1024 * 1024;
 constexpr int WindowMs = 50;
 constexpr int FallbackPendingCapacity = 24;
 
-const QSize ThumbnailSize{ThumbnailLayout::ThumbnailSize,
-                          ThumbnailLayout::ThumbnailSize};
+const QSize ThumbnailSize{ThumbnailLayout::ListIconSize,
+                          ThumbnailLayout::ListIconSize};
 
 QImage loadImage(const QString &path, const QSize &target, qreal dpr)
 {

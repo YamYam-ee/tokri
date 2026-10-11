@@ -93,3 +93,4 @@ squashfs-root/
 .flatpak-builder/
 repo/
 /dist
+build/

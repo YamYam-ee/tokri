@@ -1,10 +1,12 @@
 #include "drophandler.h"
 
 #include "filepathprovider.h"
+#include "standardpaths.h"
 #include "loghelpers.h"
 #include "textfile.h"
 
 #include <QColorSpace>
+#include <QDateTime>
 #include <QDir>
 #include <QDirIterator>
 #include <QFileInfo>
@@ -19,6 +21,12 @@ namespace {
 bool isLinkUrl(const QUrl &url)
 {
     return url.isValid() && !url.scheme().isEmpty();
+}
+
+QStringList tokriEntries()
+{
+    return QDir(StandardPaths::getPath(StandardPaths::TokriDir))
+        .entryList(QDir::AllEntries | QDir::NoDotAndDotDot | QDir::Hidden);
 }
 
 }
@@ -42,6 +50,9 @@ void DropHandler::handleDrop(QMimeData *data)
 
     QScopedPointer<QMimeData> guard(data);
     dumpMimeData(data);
+
+    const qint64 batchKey = QDateTime::currentMSecsSinceEpoch();
+    const QStringList before = tokriEntries();
 
     const char *consumer = "none";
     bool wrote = false;
@@ -69,6 +80,12 @@ void DropHandler::handleDrop(QMimeData *data)
     log.log() << "consumer=" << consumer << "wrote=" << wrote;
 
     if (wrote) {
+        QStringList added;
+        for (const QString &name : tokriEntries())
+            if (!before.contains(name))
+                added << name;
+        emit stored(batchKey, added);
+
         log.log() << "emit changed";
         emit changed();
     } else {
