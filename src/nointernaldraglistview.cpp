@@ -242,8 +242,7 @@ bool NoInternalDragListView::hitsTick(const QModelIndex &index,
 {
     using namespace ThumbnailLayout;
 
-    if (!index.isValid()
-        || !index.data(FSSortFilterProxy::DeliveredRole).toBool())
+    if (!index.isValid())
         return false;
     const QRect r = visualRect(index);
     const QRect t = tickRect(r, fontMetrics().height());
@@ -272,9 +271,19 @@ void NoInternalDragListView::setHoverEyeRow(int row)
     viewport()->update();
 }
 
+void NoInternalDragListView::setHoverTickRow(int row)
+{
+    const QVariant current = property("hoverTickRow");
+    if (current.isValid() && current.toInt() == row)
+        return;
+    setProperty("hoverTickRow", row);
+    viewport()->update();
+}
+
 void NoInternalDragListView::leaveEvent(QEvent *e)
 {
     setHoverEyeRow(-1);
+    setHoverTickRow(-1);
     QListView::leaveEvent(e);
 }
 
@@ -282,12 +291,17 @@ void NoInternalDragListView::mousePressEvent(QMouseEvent *e)
 {
     setPreviewStart(QModelIndex());
 
-    // Clicking the tick of a delivered row un-ticks it.
+    // Clicking the tick slot toggles delivered (outline -> tick -> outline).
     if (e->button() == Qt::LeftButton && e->modifiers() == Qt::NoModifier) {
         const QPoint pos = e->position().toPoint();
         const QModelIndex idx = indexAt(pos);
         if (hitsTick(idx, pos)) {
-            BasketOrder::instance().setDelivered({nameOf(idx)}, false);
+            const bool delivered =
+                !idx.data(FSSortFilterProxy::DeliveredRole).toBool();
+            BasketOrder::instance().setDelivered({nameOf(idx)}, delivered);
+            // Show the green row right away rather than the selection.
+            if (delivered && selectionModel()->isSelected(idx))
+                selectionModel()->select(idx, QItemSelectionModel::Deselect);
             e->accept();
             return;
         }
@@ -308,9 +322,13 @@ void NoInternalDragListView::mouseMoveEvent(QMouseEvent *e)
         const bool onTick = hitsTick(idx, pos);
         const bool onEye = !onTick && hitsEye(idx, pos);
         setHoverEyeRow(onEye ? idx.row() : -1);
+        setHoverTickRow(onTick ? idx.row() : -1);
         viewport()->setCursor(onTick || onEye ? Qt::PointingHandCursor
                                               : Qt::ArrowCursor);
-        setToolTip(onTick  ? QStringLiteral("Klicka för att ta bort bocken")
+        const bool ticked =
+            onTick && idx.data(FSSortFilterProxy::DeliveredRole).toBool();
+        setToolTip(onTick  ? (ticked ? QStringLiteral("Klicka för att ta bort bocken")
+                                     : QStringLiteral("Klicka för att bocka av"))
                    : onEye ? QStringLiteral("Förhandsvisa (Mellanslag)")
                            : QString());
     }

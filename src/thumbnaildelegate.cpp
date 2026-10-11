@@ -125,18 +125,42 @@ void ThumbnailDelegate::paint(QPainter *painter,
         painter->restore();
     }
 
-    if (delivered) {
+    {
         const QRectF box = tickRect(opt.rect, checkSize);
         QPainterPath tick;
         tick.moveTo(box.left() + box.width() * 0.15, box.top() + box.height() * 0.55);
         tick.lineTo(box.left() + box.width() * 0.40, box.top() + box.height() * 0.80);
         tick.lineTo(box.left() + box.width() * 0.88, box.top() + box.height() * 0.22);
 
+        const bool tickHot = opt.widget
+            && opt.widget->property("hoverTickRow").isValid()
+            && opt.widget->property("hoverTickRow").toInt() == index.row();
+
         painter->save();
         painter->setRenderHint(QPainter::Antialiasing);
-        painter->setPen(QPen(Qt::white, checkSize * 0.16,
-                             Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-        painter->drawPath(tick);
+        if (delivered) {
+            painter->setPen(QPen(Qt::white, checkSize * (tickHot ? 0.2 : 0.16),
+                                 Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+            painter->drawPath(tick);
+        } else {
+            // Not delivered yet: just the outline of a tick, to click on.
+            QPainterPathStroker stroker;
+            stroker.setWidth(checkSize * 0.18);
+            stroker.setCapStyle(Qt::RoundCap);
+            stroker.setJoinStyle(Qt::RoundJoin);
+            const QPainterPath outline = stroker.createStroke(tick).simplified();
+
+            QColor c = opt.palette.color(selected ? QPalette::HighlightedText
+                                                  : QPalette::Text);
+            if (tickHot) {
+                QColor fill(0x2e, 0xa0, 0x43, 150);
+                painter->fillPath(outline, fill);
+            }
+            c.setAlpha(tickHot ? 230 : 95);
+            painter->setPen(QPen(c, 1.1));
+            painter->setBrush(Qt::NoBrush);
+            painter->drawPath(outline);
+        }
         painter->restore();
     }
 

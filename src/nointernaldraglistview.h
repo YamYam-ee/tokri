@@ -45,6 +45,7 @@ private:
     bool hitsTick(const QModelIndex &index, const QPoint &pos) const;
     bool hitsEye(const QModelIndex &index, const QPoint &pos) const;
     void setHoverEyeRow(int row);
+    void setHoverTickRow(int row);
     void moveSelectionTo(int row);
     void setDropRow(int row);
 
