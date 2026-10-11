@@ -85,6 +85,7 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         src/basketorder.h src/basketorder.cpp
         src/previewdialog.h src/previewdialog.cpp
         src/zoomview.h src/zoomview.cpp
+        src/msgattachments.h src/msgattachments.cpp
         src/nointernaldraglistview.h src/nointernaldraglistview.cpp
         src/standardnames.h
         src/shakedetector.h src/shakedetector.cpp

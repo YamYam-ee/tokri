@@ -1,6 +1,7 @@
 #include "drophandler.h"
 
 #include "filepathprovider.h"
+#include "msgattachments.h"
 #include "standardpaths.h"
 #include "loghelpers.h"
 #include "textfile.h"
@@ -111,9 +112,28 @@ bool DropHandler::tryVirtualFiles(const QMimeData *data)
         data->data(VirtualFileMime::MimeType)).split(QChar('\n'), Qt::SkipEmptyParts);
     log.log() << "paths=" << paths;
 
+    // Mails dragged from Outlook's message list: keep their attachments
+    // (not signature/inline images) instead of the mail itself. A mail with
+    // no real attachments is kept as .msg.
+    bool fromMailList = false;
+    for (const QString &f : data->formats())
+        if (f.contains("RenPrivateMessages", Qt::CaseInsensitive))
+            fromMailList = true;
+    const QString basketDir = StandardPaths::getPath(StandardPaths::BasketDir);
+
     bool wrote = false;
-    for (const QString &path : paths)
+    for (const QString &path : paths) {
+        if (fromMailList && path.endsWith(".msg", Qt::CaseInsensitive)) {
+            const auto r = MsgAttachments::extract(path, basketDir);
+            log.log() << "mail" << path << "attachments=" << r.written.size()
+                      << "skipped=" << r.skipped;
+            if (!r.written.isEmpty()) {
+                wrote = true;
+                continue;
+            }
+        }
         wrote |= storeUrlItem(QUrl::fromLocalFile(path));
+    }
 
     // The extracted copies lived in a per-drop temp directory.
     if (!paths.isEmpty())

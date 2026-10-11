@@ -57,6 +57,8 @@ public slots:
     // Merges the selected PDFs (in list order) into one new PDF at the
     // bottom of the list; the originals go to the recycle bin.
     void mergeSelectedPdfs();
+    // Saves the real attachments of the selected .msg files into the tab.
+    void unpackSelectedMails();
 
 signals:
     void pasteRequested();

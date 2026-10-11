@@ -4,6 +4,7 @@
 #include "filereveal.h"
 #include "basketorder.h"
 #include "filepathprovider.h"
+#include "msgattachments.h"
 #include "loghelpers.h"
 #include "previewdialog.h"
 #include "sortfilterproxy.h"
@@ -259,7 +260,12 @@ TokriWindow::TokriWindow(QWidget *parent)
                 QAction *copy = nullptr, *del = nullptr, *selectAll = nullptr;
                 QAction *paste = nullptr;
                 QAction *preview = nullptr, *tick = nullptr, *untick = nullptr;
-                QAction *mergePdf = nullptr;
+                QAction *mergePdf = nullptr, *unpackMsg = nullptr;
+                bool anyMsg = false;
+                for (const QModelIndex &idx : selected)
+                    if (idx.data(QFileSystemModel::FileInfoRole).value<QFileInfo>()
+                            .suffix().compare("msg", Qt::CaseInsensitive) == 0)
+                        anyMsg = true;
 
                 bool allPdf = count >= 2;
                 for (const QModelIndex &idx : selected) {
@@ -281,6 +287,8 @@ TokriWindow::TokriWindow(QWidget *parent)
                         untick = menu.addAction("Ta bort bock");
                     if (deliveredCount < count)
                         tick = menu.addAction("Bocka av");
+                    if (anyMsg)
+                        unpackMsg = menu.addAction("Packa upp bilagor");
                     if (allPdf)
                         mergePdf = menu.addAction(
                             QString("Slå ihop %1 PDF:er").arg(count));
@@ -323,6 +331,12 @@ TokriWindow::TokriWindow(QWidget *parent)
 
                 if (chosen == preview) {
                     previewSelection();
+                    log.pop();
+                    return;
+                }
+
+                if (chosen == unpackMsg) {
+                    unpackSelectedMails();
                     log.pop();
                     return;
                 }
@@ -554,6 +568,38 @@ void TokriWindow::setSelectionDelivered(bool delivered)
     BasketOrder::instance().setDelivered(names, delivered);
     if (delivered)
         ui->listView->clearSelection();
+}
+
+void TokriWindow::unpackSelectedMails()
+{
+    // Selected .msg files, top to bottom; their attachments go to the
+    // bottom of the list as one batch. The mails themselves stay.
+    auto *view = ui->listView;
+    QModelIndexList selected = view->selectionModel()->selectedIndexes();
+    std::sort(selected.begin(), selected.end(),
+              [](const QModelIndex &a, const QModelIndex &b) { return a.row() < b.row(); });
+
+    QApplication::setOverrideCursor(Qt::WaitCursor);
+    QStringList written;
+    int skipped = 0;
+    for (const QModelIndex &idx : std::as_const(selected)) {
+        const QFileInfo fi = idx.data(QFileSystemModel::FileInfoRole).value<QFileInfo>();
+        if (fi.suffix().compare("msg", Qt::CaseInsensitive) != 0)
+            continue;
+        const auto r = MsgAttachments::extract(fi.absoluteFilePath(), currentBasketDir());
+        written << r.written;
+        skipped += r.skipped;
+    }
+    QApplication::restoreOverrideCursor();
+
+    if (written.isEmpty()) {
+        QMessageBox::information(this, "Packa upp bilagor",
+                                 skipped > 0 ? "Mejlet har bara inbäddade bilder (t.ex. signaturer), inga riktiga bilagor."
+                                             : "Mejlet har inga bilagor.");
+        return;
+    }
+    BasketOrder::instance().addBatch(QDateTime::currentMSecsSinceEpoch(), written);
+    view->clearSelection();
 }
 
 void TokriWindow::mergeSelectedPdfs()
