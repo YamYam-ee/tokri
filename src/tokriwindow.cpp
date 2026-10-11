@@ -3,6 +3,7 @@
 #include "dropawarefilesystemmodel.h"
 #include "filereveal.h"
 #include "basketorder.h"
+#include "filepathprovider.h"
 #include "loghelpers.h"
 #include "previewdialog.h"
 #include "sortfilterproxy.h"
@@ -11,7 +12,11 @@
 #include "thumbnaillayout.h"
 #include <QDir>
 #include <QHBoxLayout>
+#include <QCoreApplication>
+#include <QDateTime>
 #include <QInputDialog>
+#include <QProcess>
+#include <QStandardPaths>
 #include <QLineEdit>
 #include <QMessageBox>
 #include <QSettings>
@@ -254,6 +259,16 @@ TokriWindow::TokriWindow(QWidget *parent)
                 QAction *copy = nullptr, *del = nullptr, *selectAll = nullptr;
                 QAction *paste = nullptr;
                 QAction *preview = nullptr, *tick = nullptr, *untick = nullptr;
+                QAction *mergePdf = nullptr;
+
+                bool allPdf = count >= 2;
+                for (const QModelIndex &idx : selected) {
+                    const QFileInfo fi =
+                        idx.data(QFileSystemModel::FileInfoRole).value<QFileInfo>();
+                    if (!fi.isFile()
+                        || fi.suffix().compare("pdf", Qt::CaseInsensitive) != 0)
+                        allPdf = false;
+                }
 
                 int deliveredCount = 0;
                 for (const QModelIndex &idx : selected)
@@ -266,6 +281,9 @@ TokriWindow::TokriWindow(QWidget *parent)
                         untick = menu.addAction("Ta bort bock");
                     if (deliveredCount < count)
                         tick = menu.addAction("Bocka av");
+                    if (allPdf)
+                        mergePdf = menu.addAction(
+                            QString("Slå ihop %1 PDF:er").arg(count));
                     menu.addSeparator();
                     open = menu.addAction("&Open");
                     copy = menu.addAction("&Copy");
@@ -305,6 +323,12 @@ TokriWindow::TokriWindow(QWidget *parent)
 
                 if (chosen == preview) {
                     previewSelection();
+                    log.pop();
+                    return;
+                }
+
+                if (chosen == mergePdf) {
+                    mergeSelectedPdfs();
                     log.pop();
                     return;
                 }
@@ -530,6 +554,99 @@ void TokriWindow::setSelectionDelivered(bool delivered)
     BasketOrder::instance().setDelivered(names, delivered);
     if (delivered)
         ui->listView->clearSelection();
+}
+
+void TokriWindow::mergeSelectedPdfs()
+{
+    Logger &log = Logger::instance();
+    log.push("mergePdfs");
+
+    // An open preview may hold one of the files.
+    if (mPreview)
+        mPreview->close();
+
+    // Selected PDFs in the order they appear in the list.
+    auto *view = ui->listView;
+    QModelIndexList selected = view->selectionModel()->selectedIndexes();
+    std::sort(selected.begin(), selected.end(),
+              [](const QModelIndex &a, const QModelIndex &b) { return a.row() < b.row(); });
+    QStringList inputs;
+    for (const QModelIndex &idx : std::as_const(selected))
+        inputs << idx.data(QFileSystemModel::FileInfoRole).value<QFileInfo>().absoluteFilePath();
+    if (inputs.size() < 2) {
+        log.pop();
+        return;
+    }
+
+    const QString qpdf = QCoreApplication::applicationDirPath() + "/qpdf/qpdf.exe";
+    if (!QFileInfo::exists(qpdf)) {
+        QMessageBox::warning(this, "Slå ihop PDF:er",
+                             "Hittar inte qpdf (" + QDir::toNativeSeparators(qpdf) + ").");
+        log.pop();
+        return;
+    }
+
+    // Build in the temp folder so a half-written file never shows up in
+    // the list, then move it into the tab.
+    const QString basketDir = currentBasketDir();
+    const QString first = QFileInfo(inputs.first()).completeBaseName();
+    const QString tmp = QStandardPaths::writableLocation(QStandardPaths::TempLocation)
+        + QString("/tokri-merge-%1.pdf").arg(QDateTime::currentMSecsSinceEpoch());
+
+    QStringList args{"--empty", "--pages"};
+    args << inputs << "--" << tmp;
+
+    auto *proc = new QProcess(this);
+    proc->setProgram(qpdf);
+    proc->setArguments(args);
+    QApplication::setOverrideCursor(Qt::WaitCursor);
+    log.log() << "run qpdf inputs=" << inputs << "tmp=" << tmp;
+
+    connect(proc, &QProcess::finished, this,
+            [this, proc, inputs, tmp, basketDir, first](int code, QProcess::ExitStatus status) {
+        QApplication::restoreOverrideCursor();
+        const QString err = QString::fromLocal8Bit(proc->readAllStandardError()).trimmed();
+        proc->deleteLater();
+
+        // qpdf: 0 = ok, 3 = ok with warnings.
+        if (status != QProcess::NormalExit || (code != 0 && code != 3)
+            || !QFileInfo::exists(tmp)) {
+            QFile::remove(tmp);
+            Logger::instance().log() << "qpdf failed code=" << code << "err=" << err;
+            QMessageBox::warning(this, "Slå ihop PDF:er",
+                                 "Det gick inte att slå ihop filerna.\n\n" + err);
+            return;
+        }
+
+        const QString dst = FilePathProvider::uniquePath(
+            QDir(basketDir).filePath(first + " (sammanslagen).pdf"));
+        if (!QDir().rename(tmp, dst)) {
+            // Different drive: copy instead.
+            if (!QFile::copy(tmp, dst)) {
+                QFile::remove(tmp);
+                QMessageBox::warning(this, "Slå ihop PDF:er",
+                                     "Kunde inte spara " + QDir::toNativeSeparators(dst));
+                return;
+            }
+            QFile::remove(tmp);
+        }
+
+        // New file at the bottom; originals out of the list (recycle bin).
+        BasketOrder::instance().addBatch(QDateTime::currentMSecsSinceEpoch(), {dst});
+        for (const QString &path : inputs)
+            QFile::moveToTrash(path);
+        ui->listView->clearSelection();
+        Logger::instance().log() << "merged into" << dst << "code=" << code;
+    });
+    connect(proc, &QProcess::errorOccurred, this, [proc](QProcess::ProcessError e) {
+        if (e == QProcess::FailedToStart) {
+            QApplication::restoreOverrideCursor();
+            Logger::instance().log() << "qpdf failed to start";
+            proc->deleteLater();
+        }
+    });
+    proc->start();
+    log.pop();
 }
 
 void TokriWindow::clearAll()
