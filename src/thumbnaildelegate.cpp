@@ -77,12 +77,40 @@ void ThumbnailDelegate::paint(QPainter *painter,
     x += ListIconSize + ListHorizontalPadding;
 
     const int checkSize = QFontMetrics(opt.font).height();
-    int right = cell.right();
+    const QRect eye = eyeRect(opt.rect, checkSize);
+    const int right = eye.left() - ListHorizontalPadding;
+
+    // Preview "eye"; brighter when the mouse is on it.
+    {
+        const bool eyeHot = opt.widget
+            && opt.widget->property("hoverEyeRow").isValid()
+            && opt.widget->property("hoverEyeRow").toInt() == index.row();
+        QColor c = delivered ? QColor(Qt::white)
+                             : opt.palette.color(selected ? QPalette::HighlightedText
+                                                          : QPalette::Text);
+        c.setAlpha(eyeHot ? 255 : 120);
+
+        const QRectF r = QRectF(eye).adjusted(1, 2, -1, -2);
+        QPainterPath lid;
+        lid.moveTo(r.left(), r.center().y());
+        lid.quadTo(r.center().x(), r.top() - r.height() * 0.45,
+                   r.right(), r.center().y());
+        lid.quadTo(r.center().x(), r.bottom() + r.height() * 0.45,
+                   r.left(), r.center().y());
+
+        painter->save();
+        painter->setRenderHint(QPainter::Antialiasing);
+        painter->setPen(QPen(c, eyeHot ? 1.8 : 1.4));
+        painter->setBrush(Qt::NoBrush);
+        painter->drawPath(lid);
+        painter->setPen(Qt::NoPen);
+        painter->setBrush(c);
+        painter->drawEllipse(r.center(), r.height() * 0.28, r.height() * 0.28);
+        painter->restore();
+    }
 
     if (delivered) {
-        const QRectF box(right - checkSize + 1,
-                         cell.center().y() - checkSize / 2.0 + 1,
-                         checkSize, checkSize);
+        const QRectF box = tickRect(opt.rect, checkSize);
         QPainterPath tick;
         tick.moveTo(box.left() + box.width() * 0.15, box.top() + box.height() * 0.55);
         tick.lineTo(box.left() + box.width() * 0.40, box.top() + box.height() * 0.80);
@@ -94,8 +122,6 @@ void ThumbnailDelegate::paint(QPainter *painter,
                              Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
         painter->drawPath(tick);
         painter->restore();
-
-        right -= checkSize + ListHorizontalPadding;
     }
 
     const QRect textRect(x, cell.y(), right - x + 1, cell.height());

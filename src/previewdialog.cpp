@@ -8,6 +8,7 @@
 #include <QFileInfo>
 #include <QGuiApplication>
 #include <QImageReader>
+#include <QCloseEvent>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QMimeDatabase>
@@ -252,6 +253,24 @@ QWidget *PreviewDialog::makeMessage(const QString &path, const QString &text)
     return w;
 }
 
+void PreviewDialog::sizeForAspect(qreal aspect, int extraWidth)
+{
+    // Window shaped like the content (aspect = width / height), as tall as
+    // comfortably fits, so a whole page is visible at its proper width.
+    QScreen *scr = parentWidget() ? parentWidget()->screen() : screen();
+    const QRect avail = scr->availableGeometry();
+
+    int h = int(avail.height() * 0.88);
+    int w = int(h * aspect) + extraWidth;
+    const int maxW = int(avail.width() * 0.95);
+    if (w > maxW) {
+        w = maxW;
+        h = int((w - extraWidth) / aspect);
+    }
+    resize(qMax(w, 240), qMax(h, 200));
+    move(avail.center() - rect().center());
+}
+
 void PreviewDialog::showFile(const QString &path)
 {
     Logger &log = Logger::instance();
@@ -260,31 +279,55 @@ void PreviewDialog::showFile(const QString &path)
     const QFileInfo fi(path);
     setWindowTitle(fi.fileName());
 
-    QScreen *scr = parentWidget() ? parentWidget()->screen() : screen();
-    const QRect avail = scr->availableGeometry();
-    resize(avail.width() * 0.5, avail.height() * 0.75);
-    move(avail.center() - rect().center());
-    show();
-    raise();
-    activateWindow();
+    // Only one preview at a time.
+    if (sCurrent && sCurrent != this)
+        sCurrent->close();
+    sCurrent = this;
+
+    constexpr qreal A4 = 210.0 / 297.0;
+    constexpr int DocScrollbar = 24;
 
     QWidget *view = nullptr;
+    bool useShell = false;
+    QImage shellThumb;
     const QMimeType mime = QMimeDatabase().mimeTypeForFile(fi);
 
     if (fi.isDir()) {
         view = makeMessage(path, "Mapp: " + fi.fileName());
+        sizeForAspect(1.0, 0);
     } else if (mime.name().startsWith("image/")) {
         QImageReader reader(path);
         reader.setAutoTransform(true);
         const QImage image = reader.read();
-        if (!image.isNull())
+        if (!image.isNull()) {
             view = makeImageView(image);
+            sizeForAspect(qreal(image.width()) / qMax(1, image.height()), 0);
+        }
     } else if (mime.inherits("text/plain")) {
         view = makeTextView(path);
+        sizeForAspect(A4, DocScrollbar);
     }
 
 #ifdef Q_OS_WIN
     if (!view) {
+        // Documents: shape the window like the first page so the preview
+        // shows the full page width.
+        shellThumb = shellThumbnail(path, 1024);
+        const qreal aspect = shellThumb.isNull()
+            ? A4
+            : qreal(shellThumb.width()) / qMax(1, shellThumb.height());
+        sizeForAspect(aspect, DocScrollbar);
+        useShell = true;
+    }
+#endif
+
+    show();
+    raise();
+    activateWindow();
+    installClickToClose();
+
+#ifdef Q_OS_WIN
+    if (useShell) {
         auto *host = new ShellPreviewHost(this);
         setContent(host);
         host->show();
@@ -295,20 +338,81 @@ void PreviewDialog::showFile(const QString &path)
         }
         mContent = nullptr;
         host->deleteLater();
-
-        const QImage thumb = shellThumbnail(path, 1024);
-        if (!thumb.isNull())
-            view = makeImageView(thumb);
+        if (!shellThumb.isNull())
+            view = makeImageView(shellThumb);
     }
 #endif
 
-    if (!view)
+    if (!view) {
         view = makeMessage(path, "Ingen förhandsvisning för " + fi.fileName());
+        sizeForAspect(1.0, 0);
+    }
 
     log.log() << "path=" << path << "mime=" << mime.name();
     setContent(view);
     log.pop();
 }
+
+#ifdef Q_OS_WIN
+namespace {
+HHOOK sMouseHook = nullptr;
+
+// A left click anywhere inside the preview's client area closes it. A
+// low-level hook is used because document previews are native windows,
+// often owned by another process, that Qt never sees events for.
+LRESULT CALLBACK previewMouseProc(int code, WPARAM wParam, LPARAM lParam)
+{
+    if (code == HC_ACTION && wParam == WM_LBUTTONDOWN && PreviewDialog::current()) {
+        const auto *info = reinterpret_cast<const MSLLHOOKSTRUCT *>(lParam);
+        const HWND hwnd = reinterpret_cast<HWND>(PreviewDialog::current()->winId());
+        RECT rc;
+        GetClientRect(hwnd, &rc);
+        POINT tl{rc.left, rc.top}, br{rc.right, rc.bottom};
+        ClientToScreen(hwnd, &tl);
+        ClientToScreen(hwnd, &br);
+        const POINT pt = info->pt;
+        if (pt.x >= tl.x && pt.x < br.x && pt.y >= tl.y && pt.y < br.y
+            && WindowFromPoint(pt) != nullptr
+            && GetAncestor(WindowFromPoint(pt), GA_ROOT) == hwnd) {
+            QMetaObject::invokeMethod(PreviewDialog::current(), "close",
+                                      Qt::QueuedConnection);
+            return 1; // swallow the click
+        }
+    }
+    return CallNextHookEx(sMouseHook, code, wParam, lParam);
+}
+}
+#endif
+
+void PreviewDialog::installClickToClose()
+{
+#ifdef Q_OS_WIN
+    if (!sMouseHook)
+        sMouseHook = SetWindowsHookExW(WH_MOUSE_LL, previewMouseProc,
+                                       GetModuleHandleW(nullptr), 0);
+#endif
+}
+
+void PreviewDialog::closeEvent(QCloseEvent *e)
+{
+    if (sCurrent == this) {
+        sCurrent = nullptr;
+#ifdef Q_OS_WIN
+        if (sMouseHook) {
+            UnhookWindowsHookEx(sMouseHook);
+            sMouseHook = nullptr;
+        }
+#endif
+    }
+    QDialog::closeEvent(e);
+}
+
+PreviewDialog *PreviewDialog::current()
+{
+    return sCurrent;
+}
+
+QPointer<PreviewDialog> PreviewDialog::sCurrent;
 
 void PreviewDialog::keyPressEvent(QKeyEvent *e)
 {

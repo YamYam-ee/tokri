@@ -84,16 +84,19 @@ TokriWindow::TokriWindow(QWidget *parent)
     auto *clearButton = new QPushButton("Rensa", mBottomBar);
     clearButton->setToolTip("Flytta alla filer i korgen till papperskorgen");
     clearButton->setFocusPolicy(Qt::NoFocus);
+    clearButton->setStyleSheet(
+        "QPushButton { background: #c62828; color: white; border: none;"
+        "  border-radius: 4px; padding: 3px 14px; }"
+        "QPushButton:hover { background: #e53935; }"
+        "QPushButton:pressed { background: #8e1c1c; }"
+        "QPushButton:disabled { background: #5a3434; color: #b8a0a0; }");
     connect(clearButton, &QPushButton::clicked, this, &TokriWindow::clearAll);
     bar->addWidget(clearButton);
 
-    auto *previewButton = new QPushButton("Förhandsvisa", mBottomBar);
-    previewButton->setToolTip("Snabbtitt på markerad fil (Mellanslag)");
-    previewButton->setFocusPolicy(Qt::NoFocus);
-    connect(previewButton, &QPushButton::clicked, this,
-            &TokriWindow::previewSelection);
-    bar->addWidget(previewButton);
     bar->addStretch();
+
+    connect(ui->listView, &NoInternalDragListView::previewRequested, this,
+            &TokriWindow::previewIndex);
 
     auto *previewShortcut = new QShortcut(QKeySequence(Qt::Key_Space), ui->listView);
     previewShortcut->setContext(Qt::WidgetShortcut);
@@ -342,8 +345,15 @@ void TokriWindow::previewSelection()
         idx = selected.first();
     }
 
+    previewIndex(idx);
+}
+
+void TokriWindow::previewIndex(const QModelIndex &index)
+{
+    if (!index.isValid())
+        return;
     const QFileInfo fi =
-        idx.data(QFileSystemModel::FileInfoRole).value<QFileInfo>();
+        index.data(QFileSystemModel::FileInfoRole).value<QFileInfo>();
     auto *dlg = new PreviewDialog(this);
     dlg->showFile(fi.absoluteFilePath());
 }

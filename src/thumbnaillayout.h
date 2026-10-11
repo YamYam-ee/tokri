@@ -1,6 +1,7 @@
 #ifndef THUMBNAILLAYOUT_H
 #define THUMBNAILLAYOUT_H
 
+#include <QRect>
 #include <Qt>
 
 namespace ThumbnailLayout {
@@ -17,6 +18,24 @@ inline constexpr int ListDefaultWidth = 340;
 // height once something is in the basket.
 inline constexpr int EmptyViewportHeight = 260;
 inline constexpr int MinViewportHeight = 120;
+
+// Right-hand slots of a list row: [... name ...] [eye] [tick]. The tick slot
+// is always reserved so the eyes line up whether or not a row is delivered.
+inline QRect tickRect(const QRect &row, int fontHeight)
+{
+    const int s = fontHeight;
+    return QRect(row.right() - ListHorizontalPadding - s + 1,
+                 row.center().y() - s / 2 + 1, s, s);
+}
+
+inline QRect eyeRect(const QRect &row, int fontHeight)
+{
+    const int w = fontHeight + 4;
+    const int h = fontHeight;
+    const QRect t = tickRect(row, fontHeight);
+    return QRect(t.left() - ListHorizontalPadding - w,
+                 row.center().y() - h / 2 + 1, w, h);
+}
 inline constexpr int ColumnCount = 3;
 inline constexpr int CaptionLineCount = 3;
 inline constexpr int TileGap = 8;

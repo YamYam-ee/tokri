@@ -39,6 +39,7 @@ public slots:
     void updateCounter();
     void clearAll();
     void previewSelection();
+    void previewIndex(const QModelIndex &index);
     void setSelectionDelivered(bool delivered);
 
 signals:

@@ -2,6 +2,7 @@
 #define PREVIEWDIALOG_H
 
 #include <QDialog>
+#include <QPointer>
 #include <QString>
 
 class ShellPreviewHost;
@@ -17,15 +18,21 @@ public:
     explicit PreviewDialog(QWidget *parent = nullptr);
 
     void showFile(const QString &path);
+    static PreviewDialog *current();
 
 protected:
     void keyPressEvent(QKeyEvent *e) override;
+    void closeEvent(QCloseEvent *e) override;
 
 private:
     QWidget *makeImageView(const QImage &image);
     QWidget *makeTextView(const QString &path);
     QWidget *makeMessage(const QString &path, const QString &text);
     void setContent(QWidget *w);
+    void sizeForAspect(qreal aspect, int extraWidth);
+    void installClickToClose();
+
+    static QPointer<PreviewDialog> sCurrent;
 
     QWidget *mContent = nullptr;
 };

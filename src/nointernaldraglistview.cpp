@@ -238,8 +238,36 @@ bool NoInternalDragListView::hitsTick(const QModelIndex &index,
         || !index.data(FSSortFilterProxy::DeliveredRole).toBool())
         return false;
     const QRect r = visualRect(index);
-    const int tickWidth = fontMetrics().height() + 2 * ListHorizontalPadding + 4;
-    return pos.x() >= r.right() - tickWidth;
+    const QRect t = tickRect(r, fontMetrics().height());
+    return pos.x() >= t.left() - ListHorizontalPadding / 2;
+}
+
+bool NoInternalDragListView::hitsEye(const QModelIndex &index,
+                                     const QPoint &pos) const
+{
+    using namespace ThumbnailLayout;
+
+    if (!index.isValid())
+        return false;
+    const QRect r = visualRect(index);
+    const QRect e = eyeRect(r, fontMetrics().height());
+    return pos.x() >= e.left() - ListHorizontalPadding / 2
+           && pos.x() < e.right() + ListHorizontalPadding / 2;
+}
+
+void NoInternalDragListView::setHoverEyeRow(int row)
+{
+    const QVariant current = property("hoverEyeRow");
+    if (current.isValid() && current.toInt() == row)
+        return;
+    setProperty("hoverEyeRow", row);
+    viewport()->update();
+}
+
+void NoInternalDragListView::leaveEvent(QEvent *e)
+{
+    setHoverEyeRow(-1);
+    QListView::leaveEvent(e);
 }
 
 void NoInternalDragListView::mousePressEvent(QMouseEvent *e)
@@ -253,6 +281,11 @@ void NoInternalDragListView::mousePressEvent(QMouseEvent *e)
             e->accept();
             return;
         }
+        if (hitsEye(idx, pos)) {
+            emit previewRequested(idx);
+            e->accept();
+            return;
+        }
     }
     QListView::mousePressEvent(e);
 }
@@ -261,9 +294,15 @@ void NoInternalDragListView::mouseMoveEvent(QMouseEvent *e)
 {
     if (e->buttons() == Qt::NoButton) {
         const QPoint pos = e->position().toPoint();
-        const bool onTick = hitsTick(indexAt(pos), pos);
-        viewport()->setCursor(onTick ? Qt::PointingHandCursor : Qt::ArrowCursor);
-        setToolTip(onTick ? QStringLiteral("Klicka för att ta bort bocken") : QString());
+        const QModelIndex idx = indexAt(pos);
+        const bool onTick = hitsTick(idx, pos);
+        const bool onEye = !onTick && hitsEye(idx, pos);
+        setHoverEyeRow(onEye ? idx.row() : -1);
+        viewport()->setCursor(onTick || onEye ? Qt::PointingHandCursor
+                                              : Qt::ArrowCursor);
+        setToolTip(onTick  ? QStringLiteral("Klicka för att ta bort bocken")
+                   : onEye ? QStringLiteral("Förhandsvisa (Mellanslag)")
+                           : QString());
     }
     QListView::mouseMoveEvent(e);
 }
