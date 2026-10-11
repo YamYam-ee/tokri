@@ -8,7 +8,9 @@
 #include "thumbnaildelegate.h"
 #include "thumbnaillayout.h"
 #include <QDir>
+#include <QHBoxLayout>
 #include <QMenu>
+#include <QPushButton>
 #include <QCloseEvent>
 #include <QDesktopServices>
 #include <QFile>
@@ -71,11 +73,26 @@ TokriWindow::TokriWindow(QWidget *parent)
     ui->listView->setDropIndicatorShown(false);
     ui->listView->setContextMenuPolicy(Qt::CustomContextMenu);
 
-    // "12 filer · 5 avbockade" under the list.
-    mCounter = new QLabel(ui->centralwidget);
+    // Bottom bar: [Rensa]  ...  "12 filer · 5 avbockade"
+    mBottomBar = new QWidget(ui->centralwidget);
+    auto *bar = new QHBoxLayout(mBottomBar);
+    bar->setContentsMargins(0, 2, 4, 0);
+
+    auto *clearButton = new QPushButton("Rensa", mBottomBar);
+    clearButton->setToolTip("Flytta alla filer i korgen till papperskorgen");
+    clearButton->setFocusPolicy(Qt::NoFocus);
+    connect(clearButton, &QPushButton::clicked, this, &TokriWindow::clearAll);
+    bar->addWidget(clearButton);
+    bar->addStretch();
+
+    mCounter = new QLabel(mBottomBar);
     mCounter->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
-    mCounter->setContentsMargins(4, 2, 4, 0);
-    ui->verticalLayout->addWidget(mCounter);
+    bar->addWidget(mCounter);
+
+    ui->verticalLayout->addWidget(mBottomBar);
+    // Kept visible (only disabled when empty) so the window's height math
+    // does not shift when the basket empties or fills.
+    mBottomBar->setEnabled(false);
 
     applyColumnSizing();
 
@@ -264,7 +281,7 @@ void TokriWindow::updateCounter()
 
     if (total == 0) {
         mCounter->clear();
-        mCounter->hide();
+        mBottomBar->setEnabled(false);
         return;
     }
 
@@ -272,7 +289,19 @@ void TokriWindow::updateCounter()
                           .arg(total)
                           .arg(total == 1 ? "fil" : "filer")
                           .arg(delivered));
-    mCounter->show();
+    mBottomBar->setEnabled(true);
+}
+
+void TokriWindow::clearAll()
+{
+    Logger &log = Logger::instance();
+    log.push("clearAll");
+
+    // Same as Delete on everything: items go to the recycle bin.
+    ui->listView->selectAll();
+    deleteSelection();
+
+    log.pop();
 }
 
 void TokriWindow::fitHeightToContents()

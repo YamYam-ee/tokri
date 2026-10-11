@@ -37,6 +37,7 @@ public slots:
     void selectAll();
     void fitHeightToContents();
     void updateCounter();
+    void clearAll();
 
 signals:
     void pasteRequested();
@@ -44,6 +45,7 @@ signals:
 private:
     Ui::TokriWindow *ui;
     QLabel *mCounter = nullptr;
+    QWidget *mBottomBar = nullptr;
 
     void init();
     void applyColumnSizing();
