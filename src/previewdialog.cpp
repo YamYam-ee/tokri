@@ -16,6 +16,7 @@
 #include <QPlainTextEdit>
 #include <QResizeEvent>
 #include <QScreen>
+#include <QSettings>
 #include <QScrollArea>
 #include <QVBoxLayout>
 
@@ -232,7 +233,20 @@ void PreviewDialog::sizeForAspect(qreal aspect, int extraWidth)
 {
     // Window shaped like the content (aspect = width / height), as tall as
     // comfortably fits, so a whole page is visible at its proper width.
-    QScreen *scr = parentWidget() ? parentWidget()->screen() : screen();
+    static bool loaded = false;
+    if (!loaded) {
+        sUserCenter = QSettings().value("preview/center").toPoint();
+        loaded = true;
+    }
+
+    // Centred where the user last left a preview, otherwise over Tokri.
+    const QPoint center = sUserCenter.isNull()
+        ? (parentWidget() ? parentWidget()->frameGeometry().center()
+                          : screen()->availableGeometry().center())
+        : sUserCenter;
+    QScreen *scr = QGuiApplication::screenAt(center);
+    if (!scr)
+        scr = parentWidget() ? parentWidget()->screen() : screen();
     const QRect avail = scr->availableGeometry();
 
     int h = int(avail.height() * 0.88);
@@ -242,8 +256,15 @@ void PreviewDialog::sizeForAspect(qreal aspect, int extraWidth)
         w = maxW;
         h = int((w - extraWidth) / aspect);
     }
-    resize(qMax(w, 240), qMax(h, 200));
-    move(avail.center() - rect().center());
+    QRect r(0, 0, qMax(w, 240), qMax(h, 200));
+    r.moveCenter(center);
+    // Keep it on screen (leaving room for the title bar).
+    const int titleBar = 32;
+    r.moveLeft(qBound(avail.left(), r.left(), avail.right() + 1 - r.width()));
+    r.moveTop(qBound(avail.top() + titleBar, r.top(),
+                     qMax(avail.top() + titleBar, avail.bottom() + 1 - r.height())));
+    setGeometry(r);
+    mPlacedCenter = r.center();
 }
 
 void PreviewDialog::showFile(const QString &path)
@@ -382,6 +403,13 @@ void PreviewDialog::installClickToClose()
 
 void PreviewDialog::closeEvent(QCloseEvent *e)
 {
+    // Remember the spot if the user moved the window.
+    const QPoint c = geometry().center();
+    if (isVisible() && (c - mPlacedCenter).manhattanLength() > 8) {
+        sUserCenter = c;
+        QSettings().setValue("preview/center", c);
+    }
+
     if (sCurrent == this) {
         sCurrent = nullptr;
 #ifdef Q_OS_WIN
@@ -400,6 +428,7 @@ PreviewDialog *PreviewDialog::current()
 }
 
 QPointer<PreviewDialog> PreviewDialog::sCurrent;
+QPoint PreviewDialog::sUserCenter;
 
 void PreviewDialog::keyPressEvent(QKeyEvent *e)
 {

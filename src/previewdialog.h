@@ -2,6 +2,7 @@
 #define PREVIEWDIALOG_H
 
 #include <QDialog>
+#include <QPoint>
 #include <QPointer>
 #include <QString>
 
@@ -33,6 +34,8 @@ private:
     void installClickToClose();
 
     static QPointer<PreviewDialog> sCurrent;
+    static QPoint sUserCenter;  // where the user last moved a preview to
+    QPoint mPlacedCenter;
 
     QWidget *mContent = nullptr;
 };
