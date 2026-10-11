@@ -53,6 +53,7 @@ public slots:
     int addBasketTab(const QString &name = QString());
     void renameBasketTab(int index);
     void removeBasketTab(int index);
+    void bringToFront();
 
 signals:
     void pasteRequested();

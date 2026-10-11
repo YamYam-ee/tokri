@@ -16,6 +16,7 @@
 #include <QMessageBox>
 #include <QSettings>
 #include <QTabBar>
+#include <QTimer>
 #include <QToolButton>
 #include <functional>
 #include <QMenu>
@@ -88,10 +89,28 @@ protected:
 class TabNameEdit : public QLineEdit
 {
 public:
-    using QLineEdit::QLineEdit;
+    explicit TabNameEdit(QWidget *parent) : QLineEdit(parent)
+    {
+        // A click anywhere else in Tokri (even on areas that cannot take
+        // focus) saves the name.
+        qApp->installEventFilter(this);
+    }
+    ~TabNameEdit() override { qApp->removeEventFilter(this); }
+
     std::function<void(bool accepted)> onDone;
 
 protected:
+    bool eventFilter(QObject *watched, QEvent *e) override
+    {
+        if (!mDone && (e->type() == QEvent::MouseButtonPress
+                       || e->type() == QEvent::NonClientAreaMouseButtonPress)) {
+            auto *w = qobject_cast<QWidget *>(watched);
+            if (w && w != this && !isAncestorOf(w))
+                finish(true);
+        }
+        return QLineEdit::eventFilter(watched, e);
+    }
+
     bool event(QEvent *e) override
     {
         // Keep Escape/Enter here rather than the window's shortcuts.
@@ -122,6 +141,7 @@ private:
         if (mDone)
             return;
         mDone = true;
+        qApp->removeEventFilter(this);
         if (onDone)
             onDone(accepted);
     }
@@ -578,7 +598,8 @@ void TokriWindow::setupTabs()
         } else {
             emit dropIntoBasket(e->mimeData());
         }
-        renameBasketTab(index);
+        // Let the drop finish first, then put the cursor in the name.
+        QTimer::singleShot(50, this, [this, index] { renameBasketTab(index); });
     };
 
     // Load tabs (the first, id 0, is the original Tokri folder).
@@ -693,6 +714,29 @@ int TokriWindow::addBasketTab(const QString &name)
     return index;
 }
 
+void TokriWindow::bringToFront()
+{
+    raise();
+#ifdef Q_OS_WIN
+    // After a drop from another app Windows won't hand us the keyboard by
+    // itself; briefly attaching to the foreground thread lets us take it.
+    const HWND self = reinterpret_cast<HWND>(winId());
+    const HWND fg = GetForegroundWindow();
+    const DWORD fgThread = fg ? GetWindowThreadProcessId(fg, nullptr) : 0;
+    const DWORD me = GetCurrentThreadId();
+    if (fgThread && fgThread != me) {
+        AttachThreadInput(fgThread, me, TRUE);
+        SetForegroundWindow(self);
+        BringWindowToTop(self);
+        SetFocus(self);
+        AttachThreadInput(fgThread, me, FALSE);
+    } else {
+        SetForegroundWindow(self);
+    }
+#endif
+    activateWindow();
+}
+
 void TokriWindow::renameBasketTab(int index)
 {
     if (index < 0 || index >= mTabs.size())
@@ -706,7 +750,8 @@ void TokriWindow::renameBasketTab(int index)
     r.setWidth(qMax(r.width(), 120));
     edit->setGeometry(r);
     edit->show();
-    edit->setFocus();
+    bringToFront();
+    edit->setFocus(Qt::OtherFocusReason);
 
     const int id = mTabs[index].id;
     edit->onDone = [this, edit, id](bool accepted) {
