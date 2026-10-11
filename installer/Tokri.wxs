@@ -1,0 +1,81 @@
+<!--
+  Per-user MSI for this Tokri build: installs to %LOCALAPPDATA%\Programs\Tokri-egen
+  without admin rights, adds a Start menu shortcut and starts Tokri at login.
+  Built by build-msi.ps1 (WiX Toolset 5, installed as a dotnet global tool).
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+  <Package Name="Tokri (Erik)"
+           Manufacturer="Erik"
+           Version="$(var.Version)"
+           UpgradeCode="B72CEECD-18DB-4D52-A3BE-BAD32B96086B"
+           Scope="perUser"
+           Compressed="yes">
+
+    <MajorUpgrade DowngradeErrorMessage="En nyare version av Tokri är redan installerad." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <Icon Id="TokriIcon" SourceFile="$(var.IconFile)" />
+    <Property Id="ARPPRODUCTICON" Value="TokriIcon" />
+    <Property Id="ARPURLINFOABOUT" Value="$(var.RepoUrl)" />
+
+    <!-- Per-user install into %LOCALAPPDATA%\Programs (no admin needed). -->
+    <StandardDirectory Id="LocalAppDataFolder">
+      <Directory Id="UserProgramsFolder" Name="Programs">
+        <Directory Id="INSTALLFOLDER" Name="Tokri-egen" />
+      </Directory>
+    </StandardDirectory>
+
+    <ComponentGroup Id="AppFiles" Directory="INSTALLFOLDER">
+      <Files Include="!(bindpath.app)\**" />
+    </ComponentGroup>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Component Id="StartMenuShortcut">
+        <Shortcut Id="TokriShortcut"
+                  Name="Tokri"
+                  Description="Korg för att dra och släppa filer"
+                  Target="[INSTALLFOLDER]Tokri.exe"
+                  WorkingDirectory="INSTALLFOLDER"
+                  Icon="TokriIcon" />
+        <RegistryValue Root="HKCU" Key="Software\Tokri-egen" Name="StartMenuShortcut"
+                       Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </StandardDirectory>
+
+    <!-- Remember the folder so uninstall can remove it completely (the
+         per-user layout otherwise leaves empty subfolders behind). -->
+    <Property Id="TOKRIINSTALLDIR">
+      <RegistrySearch Id="TokriInstallDirSearch" Root="HKCU" Key="Software\Tokri-egen"
+                      Name="InstallDir" Type="raw" />
+    </Property>
+    <Component Id="InstallDirCleanup" Directory="INSTALLFOLDER" Guid="C3E5A0D2-7B1F-4E0A-8A57-2F4B9D61E2A8">
+      <RegistryValue Root="HKCU" Key="Software\Tokri-egen" Name="InstallDir"
+                     Type="string" Value="[INSTALLFOLDER]" KeyPath="yes" />
+      <util:RemoveFolderEx On="uninstall" Property="TOKRIINSTALLDIR" />
+      <RemoveFolder Id="RemoveInstallFolder" On="uninstall" />
+    </Component>
+
+    <!-- Start at login. -->
+    <Component Id="Autostart" Directory="INSTALLFOLDER" Guid="6E0B7C4E-2E4B-4C55-9D27-6A1F0E7A3B11">
+      <RegistryValue Root="HKCU" Key="Software\Microsoft\Windows\CurrentVersion\Run"
+                     Name="Tokri" Type="string" Value="&quot;[INSTALLFOLDER]Tokri.exe&quot;"
+                     KeyPath="yes" />
+    </Component>
+
+    <!-- Start Tokri when the installation finishes. -->
+    <CustomAction Id="LaunchTokri" Directory="INSTALLFOLDER"
+                  ExeCommand="&quot;[INSTALLFOLDER]Tokri.exe&quot;"
+                  Return="asyncNoWait" Impersonate="yes" />
+    <InstallExecuteSequence>
+      <Custom Action="LaunchTokri" After="InstallFinalize" Condition="NOT REMOVE" />
+    </InstallExecuteSequence>
+
+    <Feature Id="Main" Title="Tokri">
+      <ComponentGroupRef Id="AppFiles" />
+      <ComponentRef Id="StartMenuShortcut" />
+      <ComponentRef Id="Autostart" />
+      <ComponentRef Id="InstallDirCleanup" />
+    </Feature>
+  </Package>
+</Wix>

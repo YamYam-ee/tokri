@@ -94,3 +94,8 @@ squashfs-root/
 repo/
 /dist
 build/
+
+# installer output
+installer/stage/
+installer/*.msi
+installer/*.wixpdb
