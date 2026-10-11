@@ -1,0 +1,578 @@
+<title>Tokri användarguide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Source+Sans+3:wght@400;600&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: a guide that reads top to bottom; each feature pairs a short how-to
+   with a drawn mock-up of the real Tokri window beside it (stacked on phones). */
+:root {
+  --bg: #f3f5f8;           /* page: cool paper, a hint of the app's slate */
+  --surface: #ffffff;
+  --ink: #18202b;
+  --muted: #5a6574;
+  --line: #d9dee6;
+  --accent: #6b4fd0;       /* Tokri's selection purple, page accent */
+  --accent-soft: #ece8fb;
+  --done: #2ea043;         /* "levererad" green, same as the app */
+  --kbd-bg: #eef1f5;
+
+  /* The mock-ups depict the app in its dark theme in both page themes. */
+  --app-bg: #1f1f22;
+  --app-chrome: #2a2a2e;
+  --app-line: #3a3a40;
+  --app-text: #e7e7ea;
+  --app-dim: #9a9aa3;
+  --app-sel: #4a3a8c;
+  --app-hl: #7c62e6;
+
+  --f-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --f-body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "JetBrains Mono", Consolas, "Cascadia Mono", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121418; --surface: #1a1d23; --ink: #e8ebf0; --muted: #9aa3b0;
+    --line: #2c313a; --accent: #a993ff; --accent-soft: #2a2442; --done: #3fb950;
+    --kbd-bg: #232830; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121418; --surface: #1a1d23; --ink: #e8ebf0; --muted: #9aa3b0;
+  --line: #2c313a; --accent: #a993ff; --accent-soft: #2a2442; --done: #3fb950;
+  --kbd-bg: #232830; color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink);
+  font: 17px/1.55 var(--f-body);
+  padding-inline: 16px; padding-block: 0 64px;
+}
+.wrap { max-width: 1060px; margin: 0 auto; }
+
+header.top { padding-block: 48px 28px; display: grid; gap: 14px; }
+.brand { display: flex; align-items: center; gap: 14px; }
+.brand svg { width: 52px; height: 52px; flex: none; }
+h1 {
+  font-family: var(--f-display); font-weight: 800; letter-spacing: -0.02em;
+  font-size: clamp(2.1rem, 5vw, 3.2rem); line-height: 1.05; margin: 0;
+  text-wrap: balance;
+}
+.lede { color: var(--muted); max-width: 62ch; margin: 0; font-size: 1.1rem; }
+
+nav.toc {
+  display: flex; flex-wrap: wrap; gap: 8px; padding-block: 6px 30px;
+  border-bottom: 1px solid var(--line); margin-bottom: 8px;
+}
+nav.toc a {
+  font-size: 0.92rem; color: var(--ink); text-decoration: none;
+  padding: 5px 12px; border: 1px solid var(--line); border-radius: 999px;
+  background: var(--surface);
+}
+nav.toc a:hover, nav.toc a:focus-visible { border-color: var(--accent); color: var(--accent); outline: none; }
+
+section.feat {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 360px);
+  gap: 36px; align-items: start; padding-block: 44px;
+  border-bottom: 1px solid var(--line);
+}
+section.feat.wide { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 820px) { section.feat { grid-template-columns: minmax(0, 1fr); gap: 22px; } }
+
+h2 {
+  font-family: var(--f-display); font-weight: 800; font-size: 1.75rem;
+  letter-spacing: -0.01em; margin: 0 0 6px; text-wrap: balance;
+}
+.kicker {
+  font: 600 0.78rem/1 var(--f-body); letter-spacing: 0.09em; text-transform: uppercase;
+  color: var(--accent); margin-bottom: 10px; display: block;
+}
+.copy { min-width: 0; }
+.copy p { margin: 0 0 12px; max-width: 64ch; }
+ol.steps, ul.points { margin: 8px 0 14px; padding-left: 0; list-style: none; display: grid; gap: 10px; max-width: 64ch; }
+ol.steps { counter-reset: s; }
+ol.steps > li, ul.points > li { position: relative; padding-left: 36px; }
+ol.steps > li::before {
+  counter-increment: s; content: counter(s);
+  position: absolute; left: 0; top: 1px; width: 24px; height: 24px; border-radius: 50%;
+  background: var(--accent); color: #fff; font: 600 0.8rem/24px var(--f-body); text-align: center;
+}
+ul.points > li::before {
+  content: ""; position: absolute; left: 9px; top: 0.62em; width: 7px; height: 7px;
+  border-radius: 50%; background: var(--accent);
+}
+.legend li b.n { font-family: var(--f-mono); color: var(--accent); margin-right: 4px; }
+kbd {
+  font: 500 0.82rem/1 var(--f-mono); background: var(--kbd-bg); border: 1px solid var(--line);
+  border-bottom-width: 2px; border-radius: 5px; padding: 2px 6px; white-space: nowrap;
+}
+.note {
+  font-size: 0.95rem; color: var(--muted); border-left: 3px solid var(--line);
+  padding-left: 12px; margin-top: 14px; max-width: 64ch;
+}
+.note strong { color: var(--ink); }
+
+/* ---------- Tokri window mock-up ---------- */
+.win {
+  background: var(--app-bg); color: var(--app-text); border-radius: 10px;
+  border: 1px solid #000; box-shadow: 0 18px 40px -18px rgba(10, 12, 30, .45);
+  font: 13px/1.2 "Segoe UI", var(--f-body); overflow: hidden; position: relative;
+  max-width: 100%;
+}
+.titlebar { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: var(--app-chrome); }
+.titlebar .wb { margin-left: auto; color: var(--app-dim); letter-spacing: 12px; font-size: 12px; }
+.titlebar svg { width: 15px; height: 15px; }
+.menubar { padding: 3px 10px 5px; background: var(--app-chrome); color: var(--app-text); font-size: 12px; }
+.tabs { display: flex; align-items: flex-end; gap: 2px; padding: 4px 6px 0; border-bottom: 1px solid var(--app-line); position: relative; }
+.tab { padding: 5px 11px; color: var(--app-dim); border-radius: 5px 5px 0 0; position: relative; white-space: nowrap; }
+.tab.on { color: var(--app-text); background: var(--app-bg); box-shadow: inset 0 2px 0 var(--app-hl); }
+.tab.edit { background: #fff; color: #111; outline: 2px solid var(--app-hl); padding: 3px 8px; margin-bottom: 2px; border-radius: 3px; }
+.tab.edit::after { content: ""; display: inline-block; width: 1px; height: 13px; background: #111; vertical-align: -2px; margin-left: 1px; animation: blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+.plus { margin-left: auto; font: 700 18px/1 "Segoe UI", sans-serif; color: var(--app-text); padding: 2px 8px 5px; border-radius: 5px; position: relative; }
+.plus.hot { background: var(--app-sel); outline: 2px dashed var(--app-hl); }
+
+.rows { list-style: none; margin: 0; padding: 2px 0; position: relative; }
+.row {
+  display: grid; grid-template-columns: 24px minmax(0, 1fr) 20px 16px; align-items: center;
+  gap: 6px; padding: 0 8px; height: 30px; position: relative;
+}
+.row .nm { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row svg { display: block; }
+.ic { width: 22px; height: 22px; }
+.eye { width: 18px; height: 12px; color: var(--app-text); opacity: .45; }
+.tk { width: 15px; height: 15px; color: var(--app-text); opacity: .4; }
+.row.sel { background: var(--app-sel); }
+.row.done { background: rgba(46, 160, 67, .85); color: #fff; }
+.row.done .tk { opacity: 1; color: #fff; }
+.row.done .eye { color: #fff; opacity: .7; }
+.row.hover { background: rgba(124, 98, 230, .30); box-shadow: inset 4px 0 0 var(--app-hl), inset 0 0 0 1px var(--app-hl); }
+.row.start { background: rgba(124, 98, 230, .18); box-shadow: inset 3px 0 0 rgba(124, 98, 230, .8); }
+.row .eye.hot, .row .tk.hot { opacity: 1; }
+.row .tk.hot { color: var(--done); }
+.dropline { position: relative; height: 0; }
+.dropline::before { content: ""; position: absolute; left: 12px; right: 8px; top: -2px; height: 3px; border-radius: 2px; background: #b9a8ff; }
+.dropline::after { content: ""; position: absolute; left: 4px; top: -5px; width: 9px; height: 9px; border-radius: 50%; background: #b9a8ff; }
+.bottombar { display: flex; align-items: center; gap: 8px; padding: 6px 8px 8px; border-top: 1px solid var(--app-line); }
+.rensa { background: #c62828; color: #fff; border: 0; border-radius: 4px; padding: 4px 14px; font: inherit; position: relative; }
+.count { margin-left: auto; color: var(--app-text); font-size: 12px; position: relative; }
+
+/* ghost of a dragged file */
+.ghost {
+  position: absolute; display: flex; align-items: center; gap: 6px; padding: 4px 8px;
+  background: rgba(255, 255, 255, .92); color: #111; border-radius: 4px; font-size: 12px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, .35); pointer-events: none; z-index: 3;
+}
+.ghost svg { width: 16px; height: 16px; }
+
+/* callout pins: numbered, matching the list beside the mock-up */
+.pin {
+  position: absolute; z-index: 4; width: 21px; height: 21px; border-radius: 50%;
+  background: #ffd84d; color: #1b1b1b; font: 700 11px/21px var(--f-body); text-align: center;
+  box-shadow: 0 0 0 2px var(--app-bg);
+}
+
+/* context menu mock */
+.ctx {
+  position: absolute; z-index: 5; background: #2b2b30; border: 1px solid #44444c; border-radius: 6px;
+  padding: 4px 0; min-width: 170px; box-shadow: 0 12px 26px rgba(0, 0, 0, .45); font-size: 12px;
+}
+.ctx div { padding: 5px 14px; display: flex; justify-content: space-between; gap: 18px; }
+.ctx .on { background: var(--app-hl); color: #fff; }
+.ctx hr { border: 0; border-top: 1px solid #44444c; margin: 4px 0; }
+.ctx .k { color: var(--app-dim); }
+
+/* preview window mock */
+.pv { background: #2b2b2b; height: 300px; position: relative; overflow: hidden; }
+.page {
+  position: absolute; left: 50%; top: 14px; width: 62%; height: 132%; transform: translateX(-50%);
+  background: #fff; border-radius: 2px; padding: 14px 16px;
+  display: grid; align-content: start; gap: 7px;
+}
+.page i { display: block; height: 6px; background: #d5d8de; border-radius: 3px; }
+.page i.h { height: 10px; width: 55%; background: #2f3a4a; }
+.page i.s { width: 70%; }
+.page b { display: block; height: 46px; background: #e9edf3; border: 1px solid #d5d8de; border-radius: 3px; }
+.navbtn {
+  position: absolute; top: 50%; width: 38px; height: 78px; margin-top: -39px; border-radius: 10px;
+  background: rgba(0, 0, 0, .14); display: grid; place-items: center;
+}
+.navbtn svg { width: 16px; height: 26px; color: rgba(255, 255, 255, .35); }
+.navbtn.l { left: 8px; } .navbtn.r { right: 8px; background: rgba(0, 0, 0, .5); }
+.navbtn.r svg { color: #fff; }
+.zoomring {
+  position: absolute; left: 40%; top: 36%; width: 78px; height: 78px; border-radius: 50%;
+  border: 2px dashed #ffd84d; display: grid; place-items: center; color: #ffd84d;
+  font: 600 11px/1.1 var(--f-body); text-align: center; background: rgba(255, 216, 77, .08);
+}
+
+.flow { display: grid; gap: 12px; }
+.arrow-down { text-align: center; color: var(--muted); font: 600 0.85rem var(--f-body); }
+.arrow-down svg { width: 22px; height: 22px; display: block; margin: 0 auto 2px; color: var(--accent); }
+
+figure { margin: 0; min-width: 0; }
+figcaption { font-size: 0.85rem; color: var(--muted); margin-top: 8px; }
+
+/* install */
+.install {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; margin-top: 18px;
+}
+.install > div { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; min-width: 0; }
+.install h3 { font: 600 1rem/1.3 var(--f-body); margin: 0 0 4px; }
+.install p { margin: 0; color: var(--muted); font-size: 0.95rem; }
+.install code { font-family: var(--f-mono); font-size: 0.85rem; word-break: break-all; }
+
+/* shortcuts */
+.keys { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; min-width: 420px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font: 600 0.78rem var(--f-body); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); background: var(--bg); }
+tr:last-child td { border-bottom: 0; }
+td:first-child { white-space: nowrap; width: 1%; }
+
+footer { color: var(--muted); font-size: 0.9rem; padding-top: 28px; }
+footer a { color: var(--accent); }
+
+@media (prefers-reduced-motion: reduce) { .tab.edit::after { animation: none; } }
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-pdf" viewBox="0 0 22 22"><path d="M4 1h10l5 5v15H4z" fill="#f2f2f2"/><path d="M14 1v5h5" fill="#cfcfcf"/><rect x="2" y="11" width="15" height="7" rx="1.5" fill="#2e9e5b"/><text x="9.5" y="16.6" font-size="5.4" font-family="Segoe UI,Arial" font-weight="700" fill="#fff" text-anchor="middle">PDF</text></symbol>
+  <symbol id="i-txt" viewBox="0 0 22 22"><path d="M4 1h10l5 5v15H4z" fill="#f2f2f2"/><path d="M14 1v5h5" fill="#cfcfcf"/><path d="M7 10h9M7 13h9M7 16h6" stroke="#9aa0a8" stroke-width="1.2"/></symbol>
+  <symbol id="i-img" viewBox="0 0 22 22"><rect x="2" y="4" width="18" height="14" rx="2" fill="#3f78c2"/><circle cx="8" cy="9" r="2" fill="#fff"/><path d="M3 17l5-5 4 4 3-3 5 4z" fill="#a9c8f0"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 18 12"><path d="M1 6c2.2-4 5-5 8-5s5.8 1 8 5c-2.2 4-5 5-8 5S3.2 10 1 6z" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="9" cy="6" r="2.6" fill="currentColor"/></symbol>
+  <symbol id="i-tick" viewBox="0 0 16 16"><path d="M2.5 8.8l3.6 3.6L13.6 3.6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-tick-o" viewBox="0 0 16 16"><path d="M2.5 8.8l3.6 3.6L13.6 3.6" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" opacity=".9"/><path d="M2.5 8.8l3.6 3.6L13.6 3.6" fill="none" stroke="#1f1f22" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-basket" viewBox="0 0 52 52"><path d="M8 20h36l-4 24H12z" fill="#b07a3c"/><path d="M8 20h36" stroke="#7a5124" stroke-width="3" stroke-linecap="round"/><path d="M14 26h24M13 32h26M15 38h22" stroke="#7a5124" stroke-width="1.6" opacity=".8"/><path d="M18 20c0-8 4-12 8-12s8 4 8 12" fill="none" stroke="#7a5124" stroke-width="3"/><rect x="20" y="11" width="9" height="11" rx="1" fill="#f2f2f2" transform="rotate(-12 24 16)"/><rect x="26" y="10" width="9" height="12" rx="1" fill="#6b4fd0" transform="rotate(10 30 16)"/></symbol>
+  <symbol id="i-chev-l" viewBox="0 0 16 26"><path d="M12 3L4 13l8 10" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-chev-r" viewBox="0 0 16 26"><path d="M4 3l8 10-8 10" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-down" viewBox="0 0 22 22"><path d="M11 3v15M5 12l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+</svg>
+
+<div class="wrap">
+
+<header class="top">
+  <div class="brand"><svg aria-hidden="true"><use href="#i-basket"/></svg><h1>Tokri användarguide</h1></div>
+  <p class="lede">Tokri är en korg på skrivbordet. Du lägger i filer, ordnar dem, tittar på dem och drar ut dem dit de ska. Den här guiden visar alla funktioner i Eriks version, med bilder på hur det ser ut.</p>
+</header>
+
+<nav class="toc" aria-label="Innehåll">
+  <a href="#installera">Installera</a>
+  <a href="#oppna">Öppna och lägga i</a>
+  <a href="#listan">Listan</a>
+  <a href="#leverera">Dra ut och bocka av</a>
+  <a href="#sortera">Sortera</a>
+  <a href="#flikar">Flikar</a>
+  <a href="#forhandsvisa">Förhandsvisa</a>
+  <a href="#pdf">Slå ihop PDF</a>
+  <a href="#outlook">Outlook</a>
+  <a href="#tangenter">Kortkommandon</a>
+</nav>
+
+<!-- ============ INSTALL ============ -->
+<section class="feat wide" id="installera">
+  <div class="copy">
+    <span class="kicker">Kom igång</span>
+    <h2>Installera</h2>
+    <p>Ladda ner <strong>Tokri-x.y.z.msi</strong> från projektets sida på GitHub under <em>Releases</em> och dubbelklicka på den. Ingen administratör behövs.</p>
+    <div class="install">
+      <div><h3>Var hamnar den?</h3><p><code>%LOCALAPPDATA%\Programs\Tokri-egen</code>, med en genväg i Start-menyn.</p></div>
+      <div><h3>Startar själv</h3><p>Tokri startar vid inloggning och ligger i systemfältet. Stäng av under Aktivitetshanteraren → Autostart.</p></div>
+      <div><h3>Varning från Windows?</h3><p>Programmet är inte signerat. Klicka <strong>Mer info → Kör ändå</strong>.</p></div>
+      <div><h3>Avinstallera</h3><p>Inställningar → Appar → <em>Tokri (Erik)</em>. Dina filer i korgen ligger kvar.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ OPEN / ADD ============ -->
+<section class="feat" id="oppna">
+  <div class="copy">
+    <span class="kicker">Grunderna</span>
+    <h2>Öppna korgen och lägg i filer</h2>
+    <ol class="steps">
+      <li><strong>Skaka musen</strong> medan du drar en fil, så dyker korgen upp vid muspekaren. Du kan också dubbelklicka på Tokri-ikonen i systemfältet.</li>
+      <li><strong>Släpp</strong> filer, mappar, bilder, text eller länkar i fönstret. Det du släpper <em>kopieras</em> in, så originalet ligger kvar där det var.</li>
+      <li>Eller kopiera något och tryck <kbd>Ctrl</kbd>+<kbd>V</kbd> i korgen.</li>
+      <li><kbd>Esc</kbd> gömmer korgen. Allt ligger kvar till nästa gång.</li>
+    </ol>
+    <p class="note"><strong>Ordningen:</strong> filer du släpper samtidigt sorteras efter namn och nummer (1, 2, 3 … 10, 11). Varje nytt släpp hamnar sist, så korgen fylls uppifrån och ner i den ordning du lägger i saker.</p>
+  </div>
+  <figure>
+    <div class="win" aria-label="Tokri-fönstret efter två släpp">
+      <div class="titlebar"><svg><use href="#i-basket"/></svg>Tokri<span class="wb">–☐✕</span></div>
+      <div class="menubar">View</div>
+      <div class="tabs"><span class="tab on">Korg</span><span class="plus">+</span></div>
+      <ul class="rows">
+        <li class="row"><svg class="ic"><use href="#i-pdf"/></svg><span class="nm">Offert.pdf</span><svg class="eye"><use href="#i-eye"/></svg><svg class="tk"><use href="#i-tick-o"/></svg></li>
+        <li class="row start"><svg class="ic"><use href="#i-pdf"/></svg><span class="nm">Intyg 1.pdf</span><svg class="eye"><use href="#i-eye"/></svg><svg class="tk"><use href="#i-tick-o"/></svg><span class="pin" style="right:-2px;top:4px">1</span></li>
+        <li class="row start"><svg class="ic"><use href="#i-pdf"/></svg><span class="nm">Intyg 2.pdf</span><svg class="eye"><use href="#i-eye"/></svg><svg class="tk"><use href="#i-tick-o"/></svg></li>
+        <li class="row start"><svg class="ic"><use href="#i-pdf"/></svg><span class="nm">Intyg 10.pdf</span><svg class="eye"><use href="#i-eye"/></svg><svg class="tk"><use href="#i-tick-o"/></svg></li>
+      </ul>
+      <div class="bottombar"><button class="rensa" tabindex="-1">Rensa</button><span class="count">4 filer · 0 avbockade</span></div>
+    </div>
+    <figcaption><b>1</b> Tre intyg som släpptes samtidigt hamnar i nummerordning, efter offerten som lades i före dem.</figcaption>
+  </figure>
+</section>
+
+<!-- ============ LIST ============ -->
+<section class="feat" id="listan">
+  <div class="copy">
+    <span class="kicker">Översikt</span>
+    <h2>Listan</h2>
+    <ul class="points legend">
+      <li><b class="n">1</b><strong>Flikar</strong> överst. Varje flik är en egen samling.</li>
+      <li><b class="n">2</b><strong>Ögat</strong> öppnar en förhandsvisning av filen.</li>
+      <li><b class="n">3</b><strong>Bocken</strong>: en svag kontur på filer som inte är levererade. Klicka för att bocka av.</li>
+      <li><b class="n">4</b><strong>Räknaren</strong> visar hur många filer fliken har och hur många som är avbockade.</li>
+      <li><b class="n">5</b><strong>Rensa</strong> flyttar allt i fliken till papperskorgen.</li>
+    </ul>
+    <p>Raden under muspekaren lyser upp. Fönstret växer med listan ner till skärmkanten och börjar sedan scrolla.</p>
+    <p class="note"><strong>Dubbelklick</strong> öppnar filen i sitt vanliga program. <kbd>Del</kbd> flyttar markerade filer till papperskorgen.</p>
+  </div>
+  <figure>
+    <div class="win" aria-label="Listans delar">
+      <div class="titlebar"><svg><use href="#i-basket"/></svg>Tokri<span class="wb">–☐✕</span></div>
+      <div class="menubar">View</div>
+      <div class="tabs"><span class="tab on">Korg<span class="pin" style="left:-6px;top:-8px">1</span></span><span class="tab">Jobb</span><span class="tab">Intyg</span><span class="plus">+</span></div>
+      <ul class="rows">
+        <li class="row done"><svg class="ic"><use href="#i-pdf"/></svg><span class="nm">MRV_01.pdf</span><svg class="eye"><use href="#i-eye"/></svg><svg class="tk"><use href="#i-tick"/></svg></li>
+        <li class="row hover"><svg class="ic"><use href="#i-pdf"/></svg><span class="nm">MRV_02.pdf</span><svg class="eye hot"><use href="#i-eye"/></svg><svg class="tk"><use href="#i-tick-o"/></svg><span class="pin" style="right:18px;top:-11px">2</span><span class="pin" style="right:-4px;top:-11px">3</span></li>
+        <li class="row"><svg class="ic"><use href="#i-pdf"/></svg><span class="nm">MRV_03.pdf</span><svg class="eye"><use href="#i-eye"/></svg><svg class="tk"><use href="#i-tick-o"/></svg></li>
+        <li class="row"><svg class="ic"><use href="#i-img"/></svg><span class="nm">Ritning.png</span><svg class="eye"><use href="#i-eye"/></svg><svg class="tk"><use href="#i-tick-o"/></svg></li>
+        <li class="row"><svg class="ic"><use href="#i-txt"/></svg><span class="nm">Anteckning.txt</span><svg class="eye"><use href="#i-eye"/></svg><svg class="tk"><use href="#i-tick-o"/></svg></li>
+      </ul>
+      <div class="bottombar"><button class="rensa" tabindex="-1">Rensa<span class="pin" style="right:-12px;top:-11px">5</span></button><span class="count">5 filer · 1 avbockade<span class="pin" style="left:-24px;top:-3px">4</span></span></div>
+    </div>
+  </figure>
+</section>
+
+<!-- ============ DELIVER ============ -->
+<section class="feat" id="leverera">
+  <div class="copy">
+    <span class="kicker">Leverera</span>
+    <h2>Dra ut och bocka av</h2>
+    <ol class="steps">
+      <li><strong>Dra ut</strong> en eller flera filer till en mapp, ett mejl eller en webbsida. Filen <em>kopieras</em> ut och ligger kvar i korgen.</li>
+      <li>När filen har landat blir <strong>raden grön med en vit bock</strong>, så du ser vad som redan är skickat.</li>
+      <li><strong>Klicka på bocken</strong> för att ta bort den. Klicka på konturen på en vanlig rad för att bocka av den för hand.</li>
+    </ol>
+    <p>Högerklicksmenyn har också <em>Bocka av</em> och <em>Ta bort bock</em>, som gäller alla markerade filer.</p>
+    <p class="note"><strong>Filen försvinner inte</strong> när du drar ut den. Den ligger kvar tills du markerar den och trycker <kbd>Del</kbd> eller klickar på <strong>Rensa</strong>.</p>
+  </div>
+  <figure class="flow">
+    <div class="win" aria-label="En fil dras ut ur korgen">
+      <ul class="rows">
+        <li class="row sel"><svg class="ic"><use href="#i-pdf"/></svg><span class="nm">Protokoll 34810.pdf</span><svg class="eye"><use href="#i-eye"/></svg><svg class="tk"><use href="#i-tick-o"/></svg></li>
+        <li class="row"><svg class="ic"><use href="#i-pdf"/></svg><span class="nm">Protokoll 34811.pdf</span><svg class="eye"><use href="#i-eye"/></svg><svg class="tk"><use href="#i-tick-o"/></svg></li>
+      </ul>
+      <span class="ghost" style="right:10px;top:16px"><svg><use href="#i-pdf"/></svg>Protokoll 34810.pdf → mejlet</span>
+    </div>
+    <div class="arrow-down"><svg><use href="#i-down"/></svg>släppt i mejlet</div>
+    <div class="win" aria-label="Den levererade raden är grön">
+      <ul class="rows">
+        <li class="row done"><svg class="ic"><use href="#i-pdf"/></svg><span class="nm">Protokoll 34810.pdf</span><svg class="eye"><use href="#i-eye"/></svg><svg class="tk"><use href="#i-tick"/></svg></li>
+        <li class="row hover"><svg class="ic"><use href="#i-pdf"/></svg><span class="nm">Protokoll 34811.pdf</span><svg class="eye"><use href="#i-eye"/></svg><svg class="tk hot"><use href="#i-tick-o"/></svg><span class="pin" style="right:-4px;top:-11px">✓</span></li>
+      </ul>
+    </div>
+    <figcaption>Överst: filen dras till ett mejl. Nederst: den är grön och bockad. Musen står över konturen på nästa rad, som blir grön när du klickar.</figcaption>
+  </figure>
+</section>
+
+<!-- ============ SORT ============ -->
+<section class="feat" id="sortera">
+  <div class="copy">
+    <span class="kicker">Ordna</span>
+    <h2>Sortera för hand</h2>
+    <ol class="steps">
+      <li><strong>Markera</strong> det du vill flytta. <kbd>Ctrl</kbd>+klick markerar spridda filer och <kbd>Shift</kbd>+klick ett helt intervall.</li>
+      <li><strong>Dra</strong> markeringen upp eller ner i listan. Ett ljust streck visar var filerna hamnar.</li>
+      <li><strong>Släpp.</strong> Filerna läggs där strecket var och behåller sin inbördes ordning.</li>
+    </ol>
+    <p class="note"><strong>Ordningen sparas.</strong> Att flytta inom listan räknas inte som leverans, så du får ingen bock av det.</p>
+  </div>
+  <figure>
+    <div class="win" aria-label="Två filer flyttas, ett streck visar var de hamnar">
+      <ul class="rows">
+        <li class="row"><svg class="ic"><use href="#i-pdf"/></svg><span class="nm">Bilaga A.pdf</span><svg class="eye"><use href="#i-eye"/></svg><svg class="tk"><use href="#i-tick-o"/></svg></li>
+        <li class="dropline" aria-hidden="true"></li>
+        <li class="row"><svg class="ic"><use href="#i-pdf"/></svg><span class="nm">Bilaga B.pdf</span><svg class="eye"><use href="#i-eye"/></svg><svg class="tk"><use href="#i-tick-o"/></svg></li>
+        <li class="row sel"><svg class="ic"><use href="#i-pdf"/></svg><span class="nm">Bilaga C.pdf</span><svg class="eye"><use href="#i-eye"/></svg><svg class="tk"><use href="#i-tick-o"/></svg></li>
+        <li class="row"><svg class="ic"><use href="#i-pdf"/></svg><span class="nm">Bilaga D.pdf</span><svg class="eye"><use href="#i-eye"/></svg><svg class="tk"><use href="#i-tick-o"/></svg></li>
+        <li class="row sel"><svg class="ic"><use href="#i-pdf"/></svg><span class="nm">Bilaga E.pdf</span><svg class="eye"><use href="#i-eye"/></svg><svg class="tk"><use href="#i-tick-o"/></svg></li>
+      </ul>
+      <span class="ghost" style="left:60px;top:22px"><svg><use href="#i-pdf"/></svg>2 filer</span>
+    </div>
+    <figcaption>C och E är markerade med Ctrl+klick och dras upp. Strecket visar att de hamnar mellan A och B.</figcaption>
+  </figure>
+</section>
+
+<!-- ============ TABS ============ -->
+<section class="feat" id="flikar">
+  <div class="copy">
+    <span class="kicker">Samlingar</span>
+    <h2>Flikar</h2>
+    <ul class="points">
+      <li><strong>Ny flik:</strong> klicka på <strong>+</strong> och skriv ett namn direkt. <kbd>Enter</kbd> eller ett klick någon annanstans sparar namnet och <kbd>Esc</kbd> avbryter.</li>
+      <li><strong>Släpp filer på +</strong> för att skapa en ny flik med filerna i. Sedan skriver du namnet.</li>
+      <li><strong>Byt namn:</strong> dubbelklicka på fliken, eller högerklicka och välj <em>Byt namn</em>.</li>
+      <li><strong>Flytta filer mellan flikar:</strong> dra filen, håll den över en annan flik tills den byts och släpp i listan.</li>
+      <li><strong>Ändra ordning:</strong> dra flikarna i sidled.</li>
+      <li><strong>Ta bort:</strong> högerklicka och välj <em>Ta bort flik</em>. Har fliken filer får du en fråga först, och filerna flyttas till papperskorgen.</li>
+    </ul>
+    <p class="note"><strong>Var ligger filerna?</strong> Den första fliken använder <code>%USERPROFILE%\Tokri</code> och de andra <code>%USERPROFILE%\Tokri-flikar\&lt;nr&gt;</code>.</p>
+  </div>
+  <figure>
+    <div class="win" aria-label="Filer släpps på plusknappen och en ny flik namnges">
+      <div class="titlebar"><svg><use href="#i-basket"/></svg>Tokri<span class="wb">–☐✕</span></div>
+      <div class="tabs"><span class="tab">Korg</span><span class="tab">Jobb</span><span class="tab on edit">Intyg sept</span><span class="plus hot">+<span class="pin" style="right:-8px;top:-8px">1</span></span></div>
+      <ul class="rows">
+        <li class="row"><svg class="ic"><use href="#i-pdf"/></svg><span class="nm">27325.pdf</span><svg class="eye"><use href="#i-eye"/></svg><svg class="tk"><use href="#i-tick-o"/></svg></li>
+        <li class="row"><svg class="ic"><use href="#i-pdf"/></svg><span class="nm">27326.pdf</span><svg class="eye"><use href="#i-eye"/></svg><svg class="tk"><use href="#i-tick-o"/></svg></li>
+        <li class="row"><svg class="ic"><use href="#i-pdf"/></svg><span class="nm">27327.pdf</span><svg class="eye"><use href="#i-eye"/></svg><svg class="tk"><use href="#i-tick-o"/></svg></li>
+      </ul>
+      <span class="pin" style="left:154px;top:26px">2</span>
+      <div class="bottombar"><button class="rensa" tabindex="-1">Rensa</button><span class="count">3 filer · 0 avbockade</span></div>
+    </div>
+    <figcaption><b>1</b> Tre PDF:er släpptes på +. <b>2</b> Den nya fliken öppnas med namnrutan aktiv, så du kan skriva direkt.</figcaption>
+  </figure>
+</section>
+
+<!-- ============ PREVIEW ============ -->
+<section class="feat" id="forhandsvisa">
+  <div class="copy">
+    <span class="kicker">Titta</span>
+    <h2>Förhandsvisa</h2>
+    <ol class="steps">
+      <li>Klicka på <strong>ögat</strong> på en rad, eller markera en fil och tryck <kbd>Mellanslag</kbd>.</li>
+      <li><strong>Scrollhjulet zoomar</strong> där muspekaren står. Dra med musen för att flytta runt.</li>
+      <li>Byt fil med de <strong>stora pilarna</strong> i kanterna. De syns svagt och blir tydliga när du hovrar.</li>
+      <li><strong>Klicka i bilden</strong>, tryck på krysset eller <kbd>Esc</kbd> för att stänga.</li>
+    </ol>
+    <ul class="points">
+      <li>Fönstret formas efter sidan, så hela sidbredden syns. Titeln visar var du är, till exempel <em>5 / 9</em>.</li>
+      <li>Flyttar du fönstret öppnas nästa förhandsvisning på samma ställe. Annars öppnas den mitt över Tokri.</li>
+      <li>När du stänger är filen du tittade på sist markerad. Raden där du började får en tonad markering.</li>
+      <li>PDF och bilder visas med zoom. Word, Excel och Outlook-mejl visas med Windows egen förhandsvisare.</li>
+    </ul>
+    <p class="note"><kbd>+</kbd> och <kbd>−</kbd> zoomar också, piltangenterna och <kbd>PgUp</kbd>/<kbd>PgDn</kbd> flyttar, och <kbd>Home</kbd> visar hela sidbredden igen.</p>
+  </div>
+  <figure>
+    <div class="win" aria-label="Förhandsvisningsfönstret">
+      <div class="titlebar">MRV_02.pdf&nbsp;&nbsp;—&nbsp;&nbsp;5 / 9<span class="wb">–☐✕</span></div>
+      <div class="pv">
+        <div class="page"><i class="h"></i><i></i><i class="s"></i><i></i><b></b><i></i><i class="s"></i><i></i><i></i><i class="s"></i></div>
+        <div class="navbtn l"><svg><use href="#i-chev-l"/></svg></div>
+        <div class="navbtn r"><svg><use href="#i-chev-r"/></svg><span class="pin" style="left:-10px;top:-10px">2</span></div>
+        <div class="zoomring">scrolla<br>= zooma<br>här<span class="pin" style="right:-10px;top:-10px">1</span></div>
+      </div>
+    </div>
+    <figcaption><b>1</b> Zoomen följer muspekaren. <b>2</b> Pilen till höger hovras och syns tydligt. Den vänstra är nästan genomskinlig.</figcaption>
+  </figure>
+</section>
+
+<!-- ============ PDF MERGE ============ -->
+<section class="feat" id="pdf">
+  <div class="copy">
+    <span class="kicker">PDF</span>
+    <h2>Slå ihop PDF:er</h2>
+    <ol class="steps">
+      <li><strong>Markera</strong> två eller fler PDF:er med <kbd>Ctrl</kbd>+klick eller <kbd>Shift</kbd>+klick.</li>
+      <li><strong>Högerklicka</strong> och välj <em>Slå ihop N PDF:er</em>.</li>
+      <li>Den nya filen hamnar <strong>sist i listan</strong> och heter som den första filen plus <em>(sammanslagen)</em>.</li>
+    </ol>
+    <ul class="points">
+      <li>Sidorna kommer i den ordning filerna ligger i listan, uppifrån och ner. Sortera först om du vill ha en annan ordning.</li>
+      <li>Originalen tas bort ur listan och flyttas till papperskorgen, så de går att få tillbaka.</li>
+      <li>Sammanslagningen är förlustfri: text, sökbarhet och kvalitet behålls.</li>
+    </ul>
+  </div>
+  <figure class="flow">
+    <div class="win" aria-label="Tre markerade PDF:er och högerklicksmenyn" style="min-height:206px">
+      <ul class="rows">
+        <li class="row sel"><svg class="ic"><use href="#i-pdf"/></svg><span class="nm">MRV_01.pdf</span><svg class="eye"><use href="#i-eye"/></svg><svg class="tk"><use href="#i-tick-o"/></svg></li>
+        <li class="row sel"><svg class="ic"><use href="#i-pdf"/></svg><span class="nm">MRV_02.pdf</span><svg class="eye"><use href="#i-eye"/></svg><svg class="tk"><use href="#i-tick-o"/></svg></li>
+        <li class="row sel"><svg class="ic"><use href="#i-pdf"/></svg><span class="nm">MRV_03.pdf</span><svg class="eye"><use href="#i-eye"/></svg><svg class="tk"><use href="#i-tick-o"/></svg></li>
+        <li class="row"><svg class="ic"><use href="#i-txt"/></svg><span class="nm">Följebrev.txt</span><svg class="eye"><use href="#i-eye"/></svg><svg class="tk"><use href="#i-tick-o"/></svg></li>
+      </ul>
+      <div class="ctx" style="left:96px;top:44px">
+        <div>Förhandsvisa <span class="k">Mellanslag</span></div>
+        <div>Bocka av</div>
+        <div class="on">Slå ihop 3 PDF:er</div>
+        <hr>
+        <div>Open</div><div>Copy</div><div>Delete</div>
+      </div>
+    </div>
+    <div class="arrow-down"><svg><use href="#i-down"/></svg>några sekunder senare</div>
+    <div class="win" aria-label="Resultatet ligger sist i listan">
+      <ul class="rows">
+        <li class="row"><svg class="ic"><use href="#i-txt"/></svg><span class="nm">Följebrev.txt</span><svg class="eye"><use href="#i-eye"/></svg><svg class="tk"><use href="#i-tick-o"/></svg></li>
+        <li class="row hover"><svg class="ic"><use href="#i-pdf"/></svg><span class="nm">MRV_01 (sammanslagen).pdf</span><svg class="eye"><use href="#i-eye"/></svg><svg class="tk"><use href="#i-tick-o"/></svg></li>
+      </ul>
+    </div>
+  </figure>
+</section>
+
+<!-- ============ OUTLOOK ============ -->
+<section class="feat" id="outlook">
+  <div class="copy">
+    <span class="kicker">Mejl</span>
+    <h2>Dra in från Outlook</h2>
+    <p>I klassiska Outlook kan du dra in både <strong>bilagor</strong> och <strong>hela mejl</strong> i korgen.</p>
+    <ul class="points">
+      <li>En bilaga blir sin fil, till exempel en PDF.</li>
+      <li>Ett mejl blir en <code>.msg</code>-fil som du kan förhandsvisa eller öppna i Outlook igen.</li>
+      <li>Flera bilagor eller mejl på en gång fungerar också.</li>
+    </ul>
+  </div>
+  <figure>
+    <div class="win" aria-label="Ett mejl och en bilaga dragna från Outlook">
+      <ul class="rows">
+        <li class="row"><svg class="ic"><use href="#i-txt"/></svg><span class="nm">SV Leverans vecka 41.msg</span><svg class="eye"><use href="#i-eye"/></svg><svg class="tk"><use href="#i-tick-o"/></svg></li>
+        <li class="row"><svg class="ic"><use href="#i-pdf"/></svg><span class="nm">Följesedel 2210.pdf</span><svg class="eye"><use href="#i-eye"/></svg><svg class="tk"><use href="#i-tick-o"/></svg></li>
+      </ul>
+    </div>
+  </figure>
+</section>
+
+<!-- ============ KEYS ============ -->
+<section class="feat wide" id="tangenter">
+  <div class="copy">
+    <span class="kicker">Snabbare</span>
+    <h2>Kortkommandon</h2>
+    <div class="keys">
+      <table>
+        <thead><tr><th>Tangent</th><th>I korgen</th></tr></thead>
+        <tbody>
+          <tr><td><kbd>Mellanslag</kbd></td><td>Förhandsvisa markerad fil</td></tr>
+          <tr><td><kbd>Enter</kbd></td><td>Öppna i sitt vanliga program</td></tr>
+          <tr><td><kbd>F2</kbd></td><td>Byt namn på filen</td></tr>
+          <tr><td><kbd>Del</kbd></td><td>Flytta markerade filer till papperskorgen</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>C</kbd> / <kbd>Ctrl</kbd>+<kbd>V</kbd></td><td>Kopiera filer / klistra in i korgen</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>A</kbd></td><td>Markera allt</td></tr>
+          <tr><td><kbd>Ctrl</kbd>/<kbd>Shift</kbd>+klick</td><td>Markera spridda filer / ett intervall</td></tr>
+          <tr><td><kbd>Esc</kbd></td><td>Göm korgen</td></tr>
+          <tr><td><kbd>F1</kbd></td><td>Visa kortkommandon</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="keys" style="margin-top:14px">
+      <table>
+        <thead><tr><th>Tangent</th><th>I förhandsvisningen</th></tr></thead>
+        <tbody>
+          <tr><td>Scrollhjul</td><td>Zooma där muspekaren står</td></tr>
+          <tr><td>Dra med musen</td><td>Flytta runt i en inzoomad sida</td></tr>
+          <tr><td><kbd>+</kbd> / <kbd>−</kbd></td><td>Zooma in / ut</td></tr>
+          <tr><td><kbd>Home</kbd></td><td>Tillbaka till hela sidbredden</td></tr>
+          <tr><td>Pilar, <kbd>PgUp</kbd>/<kbd>PgDn</kbd></td><td>Flytta / bläddra</td></tr>
+          <tr><td>Klick, <kbd>Esc</kbd>, <kbd>Mellanslag</kbd></td><td>Stäng</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<footer>
+  Tokri är skapat av Suraj Yadav (MIT-licens). Den här versionen har tillägg av Erik. PDF-sammanslagningen använder <a href="https://github.com/qpdf/qpdf">qpdf</a>.
+</footer>
+
+</div>
