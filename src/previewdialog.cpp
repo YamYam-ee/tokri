@@ -1,9 +1,14 @@
 #include "previewdialog.h"
 
+#include "basketorder.h"
 #include "loghelpers.h"
 #include "zoomview.h"
 
+#include <QApplication>
 #include <QDir>
+#include <QDrag>
+#include <QMimeData>
+#include <QUrl>
 #include <QFile>
 #include <QFileIconProvider>
 #include <QFileInfo>
@@ -256,6 +261,168 @@ private:
     bool mPressed = false;
 };
 
+// Floating bar at the bottom of the preview:
+//   [ grip  "Dra ut" | tick  "Avbockad" / "Ej avbockad" ]
+// Drag from the left part to deliver the file (it is copied and ticked as
+// usual); click the right part to tick / untick. The whole bar turns green
+// when the file is delivered.
+class DeliverPill : public QWidget
+{
+public:
+    explicit DeliverPill(QWidget *owner)
+        : QWidget(owner, Qt::Tool | Qt::FramelessWindowHint
+                             | Qt::WindowDoesNotAcceptFocus
+                             | Qt::NoDropShadowWindowHint)
+    {
+        setAttribute(Qt::WA_TranslucentBackground);
+        setAttribute(Qt::WA_ShowWithoutActivating);
+        setMouseTracking(true);
+        setFixedSize(260, 46);
+        QObject::connect(&BasketOrder::instance(), &BasketOrder::deliveredChanged,
+                         this, [this] { update(); });
+    }
+
+    void setPath(const QString &path)
+    {
+        mPath = path;
+        update();
+    }
+
+protected:
+    bool delivered() const
+    {
+        return !mPath.isEmpty() && BasketOrder::instance().isDelivered(mPath);
+    }
+
+    QRectF gripRect() const { return QRectF(0, 0, width() * 0.46, height()); }
+    QRectF tickRect() const { return QRectF(width() * 0.46, 0, width() * 0.54, height()); }
+
+    void paintEvent(QPaintEvent *) override
+    {
+        QPainter p(this);
+        p.setRenderHint(QPainter::Antialiasing);
+        const bool done = delivered();
+        const QRectF r = QRectF(rect()).adjusted(1, 1, -1, -1);
+
+        QColor bg = done ? QColor(0x2e, 0xa0, 0x43, mHover ? 245 : 215)
+                         : QColor(0, 0, 0, mHover ? 190 : 120);
+        p.setPen(Qt::NoPen);
+        p.setBrush(bg);
+        p.drawRoundedRect(r, r.height() / 2, r.height() / 2);
+
+        const QColor fg(255, 255, 255, (done || mHover) ? 255 : 200);
+        QFont f = font();
+        f.setPointSizeF(10);
+        f.setBold(true);
+        p.setFont(f);
+
+        // Left: grip (six dots) + document, "Dra ut"
+        const QRectF g = gripRect();
+        p.setBrush(fg);
+        for (int row = 0; row < 3; ++row)
+            for (int col = 0; col < 2; ++col)
+                p.drawEllipse(QPointF(g.left() + 18 + col * 6, g.center().y() - 6 + row * 6), 1.6, 1.6);
+        const QRectF doc(g.left() + 34, g.center().y() - 9, 14, 18);
+        QPainterPath page;
+        page.moveTo(doc.topLeft());
+        page.lineTo(doc.right() - 4, doc.top());
+        page.lineTo(doc.right(), doc.top() + 4);
+        page.lineTo(doc.bottomRight());
+        page.lineTo(doc.bottomLeft());
+        page.closeSubpath();
+        p.setBrush(Qt::NoBrush);
+        p.setPen(QPen(fg, 1.6));
+        p.drawPath(page);
+        p.setPen(fg);
+        p.drawText(QRectF(doc.right() + 8, g.top(), g.right() - doc.right() - 8, g.height()),
+                   Qt::AlignVCenter | Qt::AlignLeft, QStringLiteral("Dra ut"));
+
+        // divider
+        p.setPen(QPen(QColor(255, 255, 255, 70), 1));
+        p.drawLine(QPointF(g.right(), r.top() + 10), QPointF(g.right(), r.bottom() - 10));
+
+        // Right: tick + status
+        const QRectF t = tickRect();
+        const QRectF box(t.left() + 14, t.center().y() - 8, 16, 16);
+        QPainterPath tick;
+        tick.moveTo(box.left() + box.width() * 0.12, box.top() + box.height() * 0.55);
+        tick.lineTo(box.left() + box.width() * 0.40, box.top() + box.height() * 0.82);
+        tick.lineTo(box.left() + box.width() * 0.92, box.top() + box.height() * 0.20);
+        if (done) {
+            p.setPen(QPen(Qt::white, 3, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+            p.drawPath(tick);
+        } else {
+            QPainterPathStroker stroker;
+            stroker.setWidth(3.2);
+            stroker.setCapStyle(Qt::RoundCap);
+            stroker.setJoinStyle(Qt::RoundJoin);
+            const QPainterPath outline = stroker.createStroke(tick).simplified();
+            if (mHover && tickRect().contains(mMouse))
+                p.fillPath(outline, QColor(0x2e, 0xa0, 0x43));
+            p.setPen(QPen(fg, 1.1));
+            p.setBrush(Qt::NoBrush);
+            p.drawPath(outline);
+        }
+        p.setPen(fg);
+        p.drawText(QRectF(box.right() + 9, t.top(), t.right() - box.right() - 12, t.height()),
+                   Qt::AlignVCenter | Qt::AlignLeft,
+                   done ? QStringLiteral("Avbockad") : QStringLiteral("Ej avbockad"));
+    }
+
+    void enterEvent(QEnterEvent *) override { mHover = true; update(); }
+    void leaveEvent(QEvent *) override { mHover = false; setCursor(Qt::ArrowCursor); update(); }
+
+    void mousePressEvent(QMouseEvent *e) override
+    {
+        if (e->button() == Qt::LeftButton)
+            mPress = e->position();
+    }
+
+    void mouseMoveEvent(QMouseEvent *e) override
+    {
+        mMouse = e->position();
+        if (!(e->buttons() & Qt::LeftButton)) {
+            setCursor(gripRect().contains(mMouse) ? Qt::OpenHandCursor : Qt::PointingHandCursor);
+            update();
+            return;
+        }
+        if (gripRect().contains(mPress)
+            && (e->position() - mPress).manhattanLength() >= QApplication::startDragDistance())
+            startDrag();
+    }
+
+    void mouseReleaseEvent(QMouseEvent *e) override
+    {
+        if (e->button() == Qt::LeftButton && tickRect().contains(e->position())
+            && tickRect().contains(mPress) && !mPath.isEmpty())
+            BasketOrder::instance().setDelivered({mPath}, !delivered());
+        mPress = QPointF(-1, -1);
+    }
+
+private:
+    void startDrag()
+    {
+        mPress = QPointF(-1, -1);
+        if (mPath.isEmpty() || !QFileInfo::exists(mPath))
+            return;
+        auto *mime = new QMimeData;
+        mime->setUrls({QUrl::fromLocalFile(mPath)});
+        auto *drag = new QDrag(this);
+        drag->setMimeData(mime);
+        drag->setPixmap(QFileIconProvider().icon(QFileInfo(mPath)).pixmap(32, 32));
+        // Copied out, like dragging from the list; a completed drop ticks it.
+        const QString path = mPath;
+        if (drag->exec(Qt::CopyAction, Qt::CopyAction) != Qt::IgnoreAction)
+            BasketOrder::instance().markDelivered({path});
+        setCursor(Qt::OpenHandCursor);
+    }
+
+    QString mPath;
+    QPointF mPress{-1, -1};
+    QPointF mMouse;
+    bool mHover = false;
+};
+
 PreviewDialog::PreviewDialog(QWidget *parent)
     : QDialog(parent)
 {
@@ -268,6 +435,7 @@ PreviewDialog::PreviewDialog(QWidget *parent)
 
     mPrev = new NavButton(false, this);
     mNext = new NavButton(true, this);
+    mPill = new DeliverPill(this);
     mPrev->onClick = [this] { emit navigateRequested(-1); };
     mNext->onClick = [this] { emit navigateRequested(+1); };
 }
@@ -294,9 +462,15 @@ void PreviewDialog::placeNavButtons()
     mNext->move(area.right() - margin - mNext->width() + 1, y);
     mPrev->setVisible(visible && mHasPrev);
     mNext->setVisible(visible && mHasNext);
+
+    mPill->move(area.center().x() - mPill->width() / 2,
+                area.bottom() - margin - mPill->height() + 1);
+    mPill->setVisible(visible);
+
     if (visible) {
         mPrev->raise();
         mNext->raise();
+        mPill->raise();
     }
 }
 
@@ -322,6 +496,7 @@ void PreviewDialog::hideEvent(QHideEvent *e)
 {
     mPrev->hide();
     mNext->hide();
+    mPill->hide();
     QDialog::hideEvent(e);
 }
 
@@ -456,6 +631,7 @@ void PreviewDialog::showFile(const QString &path)
 
     const QFileInfo fi(path);
     mFileName = fi.fileName();
+    mPill->setPath(fi.absoluteFilePath());
     setWindowTitle(mFileName);
 
     // Only one preview at a time.

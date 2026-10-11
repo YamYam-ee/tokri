@@ -115,6 +115,10 @@ void NoInternalDragListView::dragEnterEvent(QDragEnterEvent *e)
         e->setDropAction(Qt::CopyAction);
         e->accept();
         setDropRow(dropRowAt(e->position().toPoint()));
+    } else if (e->source()) {
+        // Dragged from elsewhere in Tokri (the preview): the file is
+        // already in the basket, so don't copy it in again.
+        e->ignore();
     } else {
         emit dropping(true);
         QListView::dragEnterEvent(e);

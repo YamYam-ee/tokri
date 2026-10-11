@@ -7,6 +7,7 @@
 #include <QString>
 
 class NavButton;
+class DeliverPill;
 class ShellPreviewHost;
 
 // Quick-look style window for one file: images and text are shown directly;
@@ -58,6 +59,7 @@ private:
     QWidget *mContent = nullptr;
     NavButton *mPrev = nullptr;
     NavButton *mNext = nullptr;
+    DeliverPill *mPill = nullptr;
     QString mFileName;
     QString mPositionText;
     bool mHasPrev = false;
