@@ -517,20 +517,25 @@ footer a { color: var(--accent); }
   <div class="copy">
     <span class="kicker">Mejl</span>
     <h2>Dra in från Outlook</h2>
-    <p>I klassiska Outlook kan du dra in både <strong>bilagor</strong> och <strong>hela mejl</strong> i korgen.</p>
+    <p>Dra ett eller flera <strong>mejl</strong> från mejllistan i klassiska Outlook till korgen, en flik eller <strong>+</strong>. Då läggs <strong>mejlens bilagor</strong> in.</p>
     <ul class="points">
-      <li>En bilaga blir sin fil, till exempel en PDF.</li>
-      <li>Ett mejl blir en <code>.msg</code>-fil som du kan förhandsvisa eller öppna i Outlook igen.</li>
-      <li>Flera bilagor eller mejl på en gång fungerar också.</li>
+      <li>Signaturbilder och bilder i själva mejltexten hoppas över. Bara riktiga bilagor kommer med.</li>
+      <li>Ett bifogat mejl sparas som <code>.msg</code>.</li>
+      <li>Har mejlet inga bilagor läggs mejlet in som <code>.msg</code>.</li>
+      <li>Drar du en enskild bilaga läggs just den filen in.</li>
+      <li>Högerklicka på en <code>.msg</code> i listan och välj <em>Packa upp bilagor</em> för att hämta ut dem i efterhand.</li>
     </ul>
   </div>
   <figure>
-    <div class="win" aria-label="Ett mejl och en bilaga dragna från Outlook">
+    <div class="win" aria-label="Ett mejl släppt på plusknappen gav en ny flik med bilagorna">
+      <div class="tabs"><span class="tab">Korg</span><span class="tab on">Leverans v41</span><span class="plus">+</span></div>
       <ul class="rows">
-        <li class="row"><svg class="ic"><use href="#i-txt"/></svg><span class="nm">SV Leverans vecka 41.msg</span><svg class="eye"><use href="#i-eye"/></svg><svg class="tk"><use href="#i-tick-o"/></svg></li>
         <li class="row"><svg class="ic"><use href="#i-pdf"/></svg><span class="nm">Följesedel 2210.pdf</span><svg class="eye"><use href="#i-eye"/></svg><svg class="tk"><use href="#i-tick-o"/></svg></li>
+        <li class="row"><svg class="ic"><use href="#i-pdf"/></svg><span class="nm">Intyg 3.1 2210.pdf</span><svg class="eye"><use href="#i-eye"/></svg><svg class="tk"><use href="#i-tick-o"/></svg></li>
+        <li class="row"><svg class="ic"><use href="#i-img"/></svg><span class="nm">Foto lastning.jpg</span><svg class="eye"><use href="#i-eye"/></svg><svg class="tk"><use href="#i-tick-o"/></svg></li>
       </ul>
     </div>
+    <figcaption>Mejlet <em>SV Leverans vecka 41</em> släpptes på +. Dess tre bilagor hamnade i en ny flik, men inte signaturloggan.</figcaption>
   </figure>
 </section>
 

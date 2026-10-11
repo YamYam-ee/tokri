@@ -55,7 +55,9 @@ Windows. Originalets README finns i [docs/UPSTREAM-README.md](docs/UPSTREAM-READ
   Förlustfritt via [qpdf](https://github.com/qpdf/qpdf).
 
 **Övrigt**
-- Dra in bilagor och mejl direkt från Outlook (klassisk)
+- Dra mejl från Outlook (klassisk): mejlens bilagor läggs in, utan
+  signaturbilder och bilder i mejltexten. Enskilda bilagor går också att dra in.
+- Högerklick på en `.msg` → **Packa upp bilagor**
 
 ## Klona och bygga
 
