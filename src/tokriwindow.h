@@ -3,6 +3,8 @@
 
 #include <QLabel>
 #include <QListView>
+#include <QPersistentModelIndex>
+#include <QPointer>
 #include <QMainWindow>
 #include <QDragEnterEvent>
 #include <QDragMoveEvent>
@@ -16,6 +18,8 @@ namespace Ui {
 class TokriWindow;
 }
 QT_END_NAMESPACE
+
+class PreviewDialog;
 
 class TokriWindow : public QMainWindow
 {
@@ -49,6 +53,8 @@ private:
     Ui::TokriWindow *ui;
     QLabel *mCounter = nullptr;
     QWidget *mBottomBar = nullptr;
+    QPointer<PreviewDialog> mPreview;
+    QPersistentModelIndex mPreviewIndex;
 
     void init();
     void applyColumnSizing();

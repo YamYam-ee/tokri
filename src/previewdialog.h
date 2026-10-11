@@ -6,6 +6,8 @@
 #include <QPointer>
 #include <QString>
 
+class QLabel;
+class QPushButton;
 class ShellPreviewHost;
 
 // Quick-look style window for one file: images and text are shown directly;
@@ -18,12 +20,20 @@ class PreviewDialog : public QDialog
 public:
     explicit PreviewDialog(QWidget *parent = nullptr);
 
+    // Can be called again on an open preview to switch file in place.
     void showFile(const QString &path);
+    // "position / count" in the basket; enables the arrows.
+    void setNavigation(int position, int count);
     static PreviewDialog *current();
+
+signals:
+    // -1 = previous (up the list), +1 = next (down the list).
+    void navigateRequested(int delta);
 
 protected:
     void keyPressEvent(QKeyEvent *e) override;
     void closeEvent(QCloseEvent *e) override;
+    bool eventFilter(QObject *watched, QEvent *e) override;
 
 private:
     QWidget *makeImageView(const QImage &image);
@@ -31,13 +41,20 @@ private:
     QWidget *makeMessage(const QString &path, const QString &text);
     void setContent(QWidget *w);
     void sizeForAspect(qreal aspect, int extraWidth);
-    void installClickToClose();
+    void installClickToClose(QWidget *nativeHost);
+    void removeClickToClose();
+    void rememberIfMoved();
+    void closeOnClick(QWidget *w);
 
     static QPointer<PreviewDialog> sCurrent;
     static QPoint sUserCenter;  // where the user last moved a preview to
     QPoint mPlacedCenter;
 
     QWidget *mContent = nullptr;
+    QPushButton *mPrev = nullptr;
+    QPushButton *mNext = nullptr;
+    QLabel *mPosition = nullptr;
+    QPoint mPressPos;
 };
 
 #endif // PREVIEWDIALOG_H

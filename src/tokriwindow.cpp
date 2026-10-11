@@ -352,10 +352,32 @@ void TokriWindow::previewIndex(const QModelIndex &index)
 {
     if (!index.isValid())
         return;
+    auto *view = ui->listView;
     const QFileInfo fi =
         index.data(QFileSystemModel::FileInfoRole).value<QFileInfo>();
-    auto *dlg = new PreviewDialog(this);
-    dlg->showFile(fi.absoluteFilePath());
+
+    // Reuse an open preview so it stays where it is while browsing.
+    if (!mPreview) {
+        mPreview = new PreviewDialog(this);
+        connect(mPreview, &PreviewDialog::navigateRequested, this,
+                [this, view](int delta) {
+                    if (!mPreviewIndex.isValid())
+                        return;
+                    const int row = mPreviewIndex.row() + delta;
+                    const QModelIndex next =
+                        view->model()->index(row, 0, view->rootIndex());
+                    if (!next.isValid())
+                        return;
+                    view->setCurrentIndex(next); // also selects it
+                    view->scrollTo(next);
+                    previewIndex(next);
+                });
+    }
+
+    mPreviewIndex = index;
+    mPreview->showFile(fi.absoluteFilePath());
+    mPreview->setNavigation(index.row() + 1,
+                            view->model()->rowCount(view->rootIndex()));
 }
 
 void TokriWindow::setSelectionDelivered(bool delivered)

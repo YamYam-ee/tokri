@@ -11,9 +11,12 @@
 #include <QImageReader>
 #include <QCloseEvent>
 #include <QKeyEvent>
+#include <QMouseEvent>
 #include <QLabel>
 #include <QMimeDatabase>
+#include <QHBoxLayout>
 #include <QPlainTextEdit>
+#include <QPushButton>
 #include <QResizeEvent>
 #include <QScreen>
 #include <QSettings>
@@ -178,6 +181,63 @@ PreviewDialog::PreviewDialog(QWidget *parent)
     setAttribute(Qt::WA_DeleteOnClose);
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(0);
+
+    // Bottom bar: [◀ Föregående]   3 / 12   [Nästa ▶]
+    auto *bar = new QWidget(this);
+    auto *h = new QHBoxLayout(bar);
+    h->setContentsMargins(8, 4, 8, 4);
+    mPrev = new QPushButton(QStringLiteral("◀  Föregående"), bar);
+    mNext = new QPushButton(QStringLiteral("Nästa  ▶"), bar);
+    mPosition = new QLabel(bar);
+    mPosition->setAlignment(Qt::AlignCenter);
+    for (QPushButton *b : {mPrev, mNext}) {
+        b->setFocusPolicy(Qt::NoFocus);
+        b->setAutoDefault(false);
+        b->setCursor(Qt::PointingHandCursor);
+    }
+    mPrev->setToolTip(QStringLiteral("Föregående fil (uppåt i listan)"));
+    mNext->setToolTip(QStringLiteral("Nästa fil (nedåt i listan)"));
+    h->addWidget(mPrev);
+    h->addStretch();
+    h->addWidget(mPosition);
+    h->addStretch();
+    h->addWidget(mNext);
+    layout->addWidget(bar);
+
+    connect(mPrev, &QPushButton::clicked, this, [this] { emit navigateRequested(-1); });
+    connect(mNext, &QPushButton::clicked, this, [this] { emit navigateRequested(+1); });
+}
+
+void PreviewDialog::setNavigation(int position, int count)
+{
+    mPosition->setText(QStringLiteral("%1 / %2").arg(position).arg(count));
+    mPrev->setEnabled(position > 1);
+    mNext->setEnabled(position < count);
+}
+
+void PreviewDialog::closeOnClick(QWidget *w)
+{
+    w->installEventFilter(this);
+}
+
+bool PreviewDialog::eventFilter(QObject *watched, QEvent *e)
+{
+    // Text and message views: a click (not a drag/selection) closes.
+    if (e->type() == QEvent::MouseButtonPress) {
+        const auto *me = static_cast<QMouseEvent *>(e);
+        if (me->button() == Qt::LeftButton)
+            mPressPos = me->globalPosition().toPoint();
+    } else if (e->type() == QEvent::MouseButtonRelease) {
+        const auto *me = static_cast<QMouseEvent *>(e);
+        if (me->button() == Qt::LeftButton
+            && (me->globalPosition().toPoint() - mPressPos).manhattanLength() < 5) {
+            auto *edit = qobject_cast<QPlainTextEdit *>(watched->parent());
+            if (!edit || !edit->textCursor().hasSelection())
+                QMetaObject::invokeMethod(this, "close", Qt::QueuedConnection);
+        }
+    }
+    return QDialog::eventFilter(watched, e);
 }
 
 void PreviewDialog::setContent(QWidget *w)
@@ -185,7 +245,7 @@ void PreviewDialog::setContent(QWidget *w)
     if (mContent)
         mContent->deleteLater();
     mContent = w;
-    layout()->addWidget(w);
+    static_cast<QVBoxLayout *>(layout())->insertWidget(0, w, 1);
 }
 
 QWidget *PreviewDialog::makeImageView(const QImage &image)
@@ -209,6 +269,7 @@ QWidget *PreviewDialog::makeTextView(const QString &path)
     edit->setPlainText(QString::fromUtf8(bytes));
     if (f.size() > MaxTextBytes)
         edit->appendPlainText("\n…");
+    closeOnClick(edit->viewport());
     return edit;
 }
 
@@ -226,6 +287,7 @@ QWidget *PreviewDialog::makeMessage(const QString &path, const QString &text)
     label->setWordWrap(true);
     l->addWidget(label);
     l->addStretch();
+    closeOnClick(w);
     return w;
 }
 
@@ -239,8 +301,10 @@ void PreviewDialog::sizeForAspect(qreal aspect, int extraWidth)
         loaded = true;
     }
 
-    // Centred where the user last left a preview, otherwise over Tokri.
-    const QPoint center = sUserCenter.isNull()
+    // Switching file in an open preview keeps it where it is; otherwise
+    // centred where the user last left a preview, or over Tokri.
+    const QPoint center = isVisible() ? geometry().center()
+        : sUserCenter.isNull()
         ? (parentWidget() ? parentWidget()->frameGeometry().center()
                           : screen()->availableGeometry().center())
         : sUserCenter;
@@ -249,13 +313,16 @@ void PreviewDialog::sizeForAspect(qreal aspect, int extraWidth)
         scr = parentWidget() ? parentWidget()->screen() : screen();
     const QRect avail = scr->availableGeometry();
 
-    int h = int(avail.height() * 0.88);
-    int w = int(h * aspect) + extraWidth;
+    // The page area excludes the navigation bar at the bottom.
+    const int barH = mPrev ? mPrev->parentWidget()->sizeHint().height() : 0;
+    int pageH = int(avail.height() * 0.88) - barH;
+    int w = int(pageH * aspect) + extraWidth;
     const int maxW = int(avail.width() * 0.95);
     if (w > maxW) {
         w = maxW;
-        h = int((w - extraWidth) / aspect);
+        pageH = int((w - extraWidth) / aspect);
     }
+    const int h = pageH + barH;
     QRect r(0, 0, qMax(w, 240), qMax(h, 200));
     r.moveCenter(center);
     // Keep it on screen (leaving room for the title bar).
@@ -279,6 +346,11 @@ void PreviewDialog::showFile(const QString &path)
     if (sCurrent && sCurrent != this)
         sCurrent->close();
     sCurrent = this;
+
+    // Switching files: drop the previous view's click hook, keep position.
+    removeClickToClose();
+    if (isVisible())
+        rememberIfMoved();
 
     constexpr qreal A4 = 210.0 / 297.0;
     constexpr int DocScrollbar = 24;
@@ -330,8 +402,6 @@ void PreviewDialog::showFile(const QString &path)
     show();
     raise();
     activateWindow();
-    if (!qobject_cast<ZoomView *>(view))
-        installClickToClose();
 
 #ifdef Q_OS_WIN
     if (useShell) {
@@ -339,6 +409,7 @@ void PreviewDialog::showFile(const QString &path)
         setContent(host);
         host->show();
         if (host->load(path)) {
+            installClickToClose(host);
             log.log() << "shell preview path=" << path;
             log.pop();
             return;
@@ -364,24 +435,19 @@ void PreviewDialog::showFile(const QString &path)
 #ifdef Q_OS_WIN
 namespace {
 HHOOK sMouseHook = nullptr;
+HWND sHostHwnd = nullptr;
 
-// A left click anywhere inside the preview's client area closes it. A
-// low-level hook is used because document previews are native windows,
-// often owned by another process, that Qt never sees events for.
+// A left click on a native document preview closes the preview window.
+// A low-level hook is used because those previews are native windows,
+// often owned by another process, that Qt never sees events for. Clicks on
+// the dialog's own buttons are not affected.
 LRESULT CALLBACK previewMouseProc(int code, WPARAM wParam, LPARAM lParam)
 {
-    if (code == HC_ACTION && wParam == WM_LBUTTONDOWN && PreviewDialog::current()) {
+    if (code == HC_ACTION && wParam == WM_LBUTTONDOWN && sHostHwnd
+        && PreviewDialog::current()) {
         const auto *info = reinterpret_cast<const MSLLHOOKSTRUCT *>(lParam);
-        const HWND hwnd = reinterpret_cast<HWND>(PreviewDialog::current()->winId());
-        RECT rc;
-        GetClientRect(hwnd, &rc);
-        POINT tl{rc.left, rc.top}, br{rc.right, rc.bottom};
-        ClientToScreen(hwnd, &tl);
-        ClientToScreen(hwnd, &br);
-        const POINT pt = info->pt;
-        if (pt.x >= tl.x && pt.x < br.x && pt.y >= tl.y && pt.y < br.y
-            && WindowFromPoint(pt) != nullptr
-            && GetAncestor(WindowFromPoint(pt), GA_ROOT) == hwnd) {
+        const HWND hit = WindowFromPoint(info->pt);
+        if (hit && (hit == sHostHwnd || IsChild(sHostHwnd, hit))) {
             QMetaObject::invokeMethod(PreviewDialog::current(), "close",
                                       Qt::QueuedConnection);
             return 1; // swallow the click
@@ -392,32 +458,47 @@ LRESULT CALLBACK previewMouseProc(int code, WPARAM wParam, LPARAM lParam)
 }
 #endif
 
-void PreviewDialog::installClickToClose()
+void PreviewDialog::installClickToClose(QWidget *nativeHost)
 {
 #ifdef Q_OS_WIN
+    sHostHwnd = reinterpret_cast<HWND>(nativeHost->winId());
     if (!sMouseHook)
         sMouseHook = SetWindowsHookExW(WH_MOUSE_LL, previewMouseProc,
                                        GetModuleHandleW(nullptr), 0);
+#else
+    Q_UNUSED(nativeHost);
 #endif
+}
+
+void PreviewDialog::removeClickToClose()
+{
+#ifdef Q_OS_WIN
+    sHostHwnd = nullptr;
+    if (sMouseHook) {
+        UnhookWindowsHookEx(sMouseHook);
+        sMouseHook = nullptr;
+    }
+#endif
+}
+
+void PreviewDialog::rememberIfMoved()
+{
+    const QPoint c = geometry().center();
+    if ((c - mPlacedCenter).manhattanLength() > 8) {
+        sUserCenter = c;
+        QSettings().setValue("preview/center", c);
+    }
 }
 
 void PreviewDialog::closeEvent(QCloseEvent *e)
 {
     // Remember the spot if the user moved the window.
-    const QPoint c = geometry().center();
-    if (isVisible() && (c - mPlacedCenter).manhattanLength() > 8) {
-        sUserCenter = c;
-        QSettings().setValue("preview/center", c);
-    }
+    if (isVisible())
+        rememberIfMoved();
 
     if (sCurrent == this) {
         sCurrent = nullptr;
-#ifdef Q_OS_WIN
-        if (sMouseHook) {
-            UnhookWindowsHookEx(sMouseHook);
-            sMouseHook = nullptr;
-        }
-#endif
+        removeClickToClose();
     }
     QDialog::closeEvent(e);
 }
