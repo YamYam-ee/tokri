@@ -16,6 +16,7 @@
 #include <QFrame>
 #include <QApplication>
 #include <QClipboard>
+#include <QScreen>
 #include <QUrl>
 
 #ifdef Q_OS_WIN
@@ -203,8 +204,10 @@ void TokriWindow::wakeUp()
               << "hidden=" << hidden;
 
     if (minimized || hidden) {
+        fitHeight(true);
         moveNearCursor();
     }
+    fitHeight(false);
 
     if (minimized) {
         showNormal();
@@ -235,6 +238,47 @@ void TokriWindow::applyColumnSizing()
 {
     setMinimumWidth(ThumbnailLayout::ListMinWidth);
     resize(ThumbnailLayout::ListDefaultWidth, height());
+}
+
+void TokriWindow::fitHeightToContents()
+{
+    fitHeight(false);
+}
+
+// Grows (or shrinks) the window so every row is visible. The height is capped
+// at the bottom of the screen (or, when about to be shown elsewhere, at the
+// screen height); beyond that the list scrolls.
+void TokriWindow::fitHeight(bool anywhereOnScreen)
+{
+    using namespace ThumbnailLayout;
+
+    auto *view = ui->listView;
+    auto *m = view->model();
+    if (!m)
+        return;
+
+    const int rows = m->rowCount(view->rootIndex());
+    const int rowHeight = rows > 0 ? view->sizeHintForRow(0) : 0;
+    const int viewportHeight =
+        rows > 0 ? qMax(rows * rowHeight, MinViewportHeight)
+                 : EmptyViewportHeight;
+
+    const int chrome = height() - view->viewport()->height();
+    int desired = chrome + viewportHeight;
+
+    QScreen *scr = isVisible() ? screen()
+                               : QGuiApplication::screenAt(QCursor::pos());
+    if (!scr)
+        scr = screen();
+    const QRect avail = scr->availableGeometry();
+    const int titleBar = frameGeometry().height() - height();
+    const int top = anywhereOnScreen ? avail.top() : frameGeometry().top();
+    const int maxHeight = avail.bottom() + 1 - top - titleBar;
+
+    desired = qMin(desired, maxHeight);
+    desired = qMax(desired, minimumSizeHint().height());
+    if (desired != height())
+        resize(width(), desired);
 }
 
 void TokriWindow::moveNearCursor()

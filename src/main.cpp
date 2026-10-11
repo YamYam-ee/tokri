@@ -16,6 +16,7 @@
 
 #ifdef Q_OS_WIN
 #include "windowsdragshakedetector.h"
+#include "virtualfileconverter.h"
 #endif
 
 #ifdef Q_OS_LINUX
@@ -41,6 +42,7 @@
 #include <QStackedWidget>
 #include <QStandardPaths>
 #include <QThread>
+#include <QTimer>
 #include <QVBoxLayout>
 #include <QLocalServer>
 #include <QLocalSocket>
@@ -66,6 +68,8 @@ int main(int argc, char *argv[])
 
 #ifdef Q_OS_WIN
     a.setStyle(QStyleFactory::create("Fusion"));
+    // Lets Outlook attachments and mails be dropped (registers itself).
+    static VirtualFileMimeConverter virtualFileConverter;
 #endif
 
     a.setPalette(ThemeProvider::theme());
@@ -286,9 +290,19 @@ int main(int argc, char *argv[])
                                                   const QString &newName) {
                          basketOrder.rename(oldName, newName);
                      });
-    // New items land at the bottom; bring them into view.
+    // New items land at the bottom; grow the window and bring them into view.
+    const auto fitAndScroll = [&tokriWindow, listView] {
+        QTimer::singleShot(0, &tokriWindow, [&tokriWindow, listView] {
+            tokriWindow.fitHeightToContents();
+            listView->scrollToBottom();
+        });
+    };
     QObject::connect(sortFilterProxy, &QAbstractItemModel::rowsInserted,
-                     listView, [listView] { listView->scrollToBottom(); });
+                     listView, fitAndScroll);
+    QObject::connect(sortFilterProxy, &QAbstractItemModel::rowsRemoved,
+                     listView, fitAndScroll);
+    QObject::connect(sortFilterProxy, &QAbstractItemModel::modelReset,
+                     listView, fitAndScroll);
 
     DropHandler *dropHandler = new DropHandler;
     QObject::connect(dropHandler, &DropHandler::stored,

@@ -4,6 +4,7 @@
 #include "standardpaths.h"
 #include "loghelpers.h"
 #include "textfile.h"
+#include "virtualfilemime.h"
 
 #include <QColorSpace>
 #include <QDateTime>
@@ -57,7 +58,10 @@ void DropHandler::handleDrop(QMimeData *data)
     const char *consumer = "none";
     bool wrote = false;
 
-    if (tryMultiUrls(data)) {
+    if (tryVirtualFiles(data)) {
+        consumer = "virtual-files";
+        wrote = true;
+    } else if (tryMultiUrls(data)) {
         consumer = "multi-url";
         wrote = true;
     } else if (tryLocalFile(data)) {
@@ -93,6 +97,30 @@ void DropHandler::handleDrop(QMimeData *data)
     }
 
     log.pop();
+}
+
+bool DropHandler::tryVirtualFiles(const QMimeData *data)
+{
+    if (!data->hasFormat(VirtualFileMime::MimeType))
+        return false;
+
+    Logger &log = Logger::instance();
+    log.push("virtual-files");
+
+    const QStringList paths = QString::fromUtf8(
+        data->data(VirtualFileMime::MimeType)).split(QChar('\n'), Qt::SkipEmptyParts);
+    log.log() << "paths=" << paths;
+
+    bool wrote = false;
+    for (const QString &path : paths)
+        wrote |= storeUrlItem(QUrl::fromLocalFile(path));
+
+    // The extracted copies lived in a per-drop temp directory.
+    if (!paths.isEmpty())
+        QDir(QFileInfo(paths.first()).path()).removeRecursively();
+
+    log.pop();
+    return wrote;
 }
 
 bool DropHandler::tryMultiUrls(const QMimeData *data)

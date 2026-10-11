@@ -31,6 +31,15 @@ void ThumbnailDelegate::paint(QPainter *painter,
     QStyle *style = opt.widget ? opt.widget->style() : QApplication::style();
     style->drawControl(QStyle::CE_ItemViewItem, &opt, painter, opt.widget);
 
+    const bool delivered =
+        index.data(FSSortFilterProxy::DeliveredRole).toBool();
+    const bool selected = opt.state & QStyle::State_Selected;
+
+    // Delivered rows are tinted green; lighter when selected so the
+    // selection still shows through.
+    if (delivered)
+        painter->fillRect(opt.rect, QColor(0x2e, 0xa0, 0x43, selected ? 130 : 210));
+
     const QRect cell = opt.rect.adjusted(ListHorizontalPadding, 0,
                                          -ListHorizontalPadding, 0);
     int x = cell.x();
@@ -49,8 +58,6 @@ void ThumbnailDelegate::paint(QPainter *painter,
     }
     x += ListIconSize + ListHorizontalPadding;
 
-    const bool delivered =
-        index.data(FSSortFilterProxy::DeliveredRole).toBool();
     const int checkSize = QFontMetrics(opt.font).height();
     int right = cell.right();
 
@@ -65,7 +72,7 @@ void ThumbnailDelegate::paint(QPainter *painter,
 
         painter->save();
         painter->setRenderHint(QPainter::Antialiasing);
-        painter->setPen(QPen(QColor(0x2e, 0xa0, 0x43), checkSize * 0.16,
+        painter->setPen(QPen(Qt::white, checkSize * 0.16,
                              Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
         painter->drawPath(tick);
         painter->restore();
@@ -75,9 +82,9 @@ void ThumbnailDelegate::paint(QPainter *painter,
 
     const QRect textRect(x, cell.y(), right - x + 1, cell.height());
     const QColor color =
-        opt.palette.color((opt.state & QStyle::State_Selected)
-                              ? QPalette::HighlightedText
-                              : QPalette::Text);
+        delivered ? QColor(Qt::white)
+                  : opt.palette.color(selected ? QPalette::HighlightedText
+                                               : QPalette::Text);
     const QString elided =
         QFontMetrics(opt.font).elidedText(text, Qt::ElideMiddle, textRect.width());
 

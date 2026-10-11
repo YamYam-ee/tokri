@@ -34,6 +34,7 @@ public slots:
     void copySelection();
     void openSelection();
     void selectAll();
+    void fitHeightToContents();
 
 signals:
     void pasteRequested();
@@ -43,6 +44,7 @@ private:
 
     void init();
     void applyColumnSizing();
+    void fitHeight(bool anywhereOnScreen);
     void moveNearCursor();
     void closeEvent(QCloseEvent *e);
     void openItem(QString filePath);

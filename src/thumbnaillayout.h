@@ -13,6 +13,10 @@ inline constexpr int ListRowPadding = 3;
 inline constexpr int ListHorizontalPadding = 6;
 inline constexpr int ListMinWidth = 280;
 inline constexpr int ListDefaultWidth = 340;
+// Viewport height when empty (room for the drop hint) and the smallest
+// height once something is in the basket.
+inline constexpr int EmptyViewportHeight = 260;
+inline constexpr int MinViewportHeight = 120;
 inline constexpr int ColumnCount = 3;
 inline constexpr int CaptionLineCount = 3;
 inline constexpr int TileGap = 8;

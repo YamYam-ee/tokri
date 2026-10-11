@@ -1,6 +1,7 @@
 #include "dropawarefilesystemmodel.h"
 
 #include "loghelpers.h"
+#include "virtualfilemime.h"
 
 namespace {
 
@@ -38,6 +39,7 @@ Qt::ItemFlags DropAwareFileSystemModel::flags(const QModelIndex &index) const  {
 bool DropAwareFileSystemModel::isPasteable(const QMimeData *data)
 {
     return data && (data->hasUrls()
+                    || data->hasFormat(VirtualFileMime::MimeType)
                     || data->hasImage()
                     || data->hasText()
                     || data->hasHtml());

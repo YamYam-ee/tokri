@@ -53,6 +53,9 @@ if (WIN32)
     list(APPEND WINDOWS_SOURCES
         src/windowsdragshakedetector.h
         src/windowsdragshakedetector.cpp
+        src/virtualfilemime.h
+        src/virtualfileconverter.h
+        src/virtualfileconverter.cpp
     )
 endif()
 
@@ -181,6 +184,7 @@ endif()
 if(WIN32)
     target_link_libraries(Tokri PRIVATE
         user32
+        ole32
     )
 endif()
 

@@ -23,6 +23,7 @@ signals:
     void failed(const QString &reason);
 
 private:
+    bool tryVirtualFiles(const QMimeData *data);
     bool tryMultiUrls(const QMimeData *data);
     bool tryLocalFile(const QMimeData *data);
     bool tryImage(const QMimeData *data);
