@@ -1,6 +1,7 @@
 #include "previewdialog.h"
 
 #include "loghelpers.h"
+#include "zoomview.h"
 
 #include <QDir>
 #include <QFile>
@@ -29,35 +30,6 @@
 namespace {
 
 constexpr qint64 MaxTextBytes = 2 * 1024 * 1024;
-
-// Shows an image scaled down to fit, never up-scaled.
-class FitImageLabel : public QLabel
-{
-public:
-    explicit FitImageLabel(const QImage &image, QWidget *parent = nullptr)
-        : QLabel(parent), mPixmap(QPixmap::fromImage(image))
-    {
-        setAlignment(Qt::AlignCenter);
-        setMinimumSize(1, 1);
-        setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Ignored);
-    }
-
-protected:
-    void resizeEvent(QResizeEvent *e) override
-    {
-        QLabel::resizeEvent(e);
-        const qreal dpr = devicePixelRatioF();
-        const QSize avail = size() * dpr;
-        QPixmap pm = mPixmap;
-        if (pm.width() > avail.width() || pm.height() > avail.height())
-            pm = pm.scaled(avail, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-        pm.setDevicePixelRatio(dpr);
-        setPixmap(pm);
-    }
-
-private:
-    QPixmap mPixmap;
-};
 
 }
 
@@ -217,7 +189,10 @@ void PreviewDialog::setContent(QWidget *w)
 
 QWidget *PreviewDialog::makeImageView(const QImage &image)
 {
-    return new FitImageLabel(image, this);
+    auto *view = new ZoomView(this);
+    view->setImage(image);
+    connect(view, &ZoomView::clicked, this, &QWidget::close);
+    return view;
 }
 
 QWidget *PreviewDialog::makeTextView(const QString &path)
@@ -295,6 +270,16 @@ void PreviewDialog::showFile(const QString &path)
     if (fi.isDir()) {
         view = makeMessage(path, "Mapp: " + fi.fileName());
         sizeForAspect(1.0, 0);
+    } else if (fi.suffix().compare("pdf", Qt::CaseInsensitive) == 0) {
+        // Own renderer: zoom with the wheel at the cursor, drag to pan.
+        auto *zoom = new ZoomView(this);
+        if (zoom->setPdf(path)) {
+            connect(zoom, &ZoomView::clicked, this, &QWidget::close);
+            view = zoom;
+            sizeForAspect(zoom->firstPageAspect(), 0);
+        } else {
+            delete zoom;
+        }
     } else if (mime.name().startsWith("image/")) {
         QImageReader reader(path);
         reader.setAutoTransform(true);
@@ -324,7 +309,8 @@ void PreviewDialog::showFile(const QString &path)
     show();
     raise();
     activateWindow();
-    installClickToClose();
+    if (!qobject_cast<ZoomView *>(view))
+        installClickToClose();
 
 #ifdef Q_OS_WIN
     if (useShell) {
@@ -350,6 +336,7 @@ void PreviewDialog::showFile(const QString &path)
 
     log.log() << "path=" << path << "mime=" << mime.name();
     setContent(view);
+    view->setFocus();
     log.pop();
 }
 
