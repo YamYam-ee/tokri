@@ -20,6 +20,7 @@ class TokriWindow;
 QT_END_NAMESPACE
 
 class PreviewDialog;
+class QTabBar;
 
 class TokriWindow : public QMainWindow
 {
@@ -46,8 +47,17 @@ public slots:
     void previewIndex(const QModelIndex &index);
     void setSelectionDelivered(bool delivered);
 
+    // Tabs: each tab is its own directory of items.
+    void initTabs();               // call once the models are connected
+    QString currentBasketDir() const;
+    int addBasketTab(const QString &name = QString());
+    void renameBasketTab(int index);
+    void removeBasketTab(int index);
+
 signals:
     void pasteRequested();
+    void basketDirChanged(const QString &dir);
+    void dropIntoBasket(const QMimeData *data);
 
 private:
     Ui::TokriWindow *ui;
@@ -56,6 +66,19 @@ private:
     QPointer<PreviewDialog> mPreview;
     QPersistentModelIndex mPreviewIndex;
     QPersistentModelIndex mPreviewStartIndex;
+
+    struct BasketTab {
+        int id;
+        QString name;
+    };
+    QList<BasketTab> mTabs;
+    int mNextTabId = 1;
+    QTabBar *mTabBar = nullptr;
+
+    void setupTabs();
+    void saveTabs() const;
+    void onTabChanged(int index);
+    static QString tabDir(int id);
 
     void init();
     void applyColumnSizing();

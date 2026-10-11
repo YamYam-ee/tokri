@@ -20,6 +20,10 @@ public:
     void setPreviewStart(const QModelIndex &index);
     QModelIndex previewStart() const { return mPreviewStart; }
 
+    // Something other than the list (e.g. the "+" tab button) took this
+    // list's own drag: don't count it as delivered.
+    void acceptInternalDrop() { mDroppedOnSelf = true; }
+
 protected:
     void startDrag(Qt::DropActions supportedActions) override;
     void dragEnterEvent(QDragEnterEvent *e) override;

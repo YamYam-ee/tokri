@@ -34,14 +34,14 @@ public:
     }
 
     static QString nameFromPath(const QString &path) {
-        const QString rootPath = StandardPaths::getPath(StandardPaths::TokriDir);
+        const QString rootPath = StandardPaths::getPath(StandardPaths::BasketDir);
         const QString result = QDir(rootPath).filePath(sanitizeName(QDir(path).dirName()));
         Logger::instance().log() << "nameFromPath path=" << path << "->" << result;
         return result;
     }
 
     static QString nameWithPrefix(const QString &prefix = QString()) {
-        const QString rootPath = StandardPaths::getPath(StandardPaths::TokriDir);
+        const QString rootPath = StandardPaths::getPath(StandardPaths::BasketDir);
         QString name = QUuid::createUuid().toString(QUuid::WithoutBraces);
         if (!prefix.isEmpty())
             name = prefix + "_" + name;

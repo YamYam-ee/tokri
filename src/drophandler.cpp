@@ -24,10 +24,9 @@ bool isLinkUrl(const QUrl &url)
     return url.isValid() && !url.scheme().isEmpty();
 }
 
-QStringList tokriEntries()
+QStringList basketEntries(const QString &dir)
 {
-    return QDir(StandardPaths::getPath(StandardPaths::TokriDir))
-        .entryList(QDir::AllEntries | QDir::NoDotAndDotDot | QDir::Hidden);
+    return QDir(dir).entryList(QDir::AllEntries | QDir::NoDotAndDotDot | QDir::Hidden);
 }
 
 }
@@ -53,7 +52,8 @@ void DropHandler::handleDrop(QMimeData *data)
     dumpMimeData(data);
 
     const qint64 batchKey = QDateTime::currentMSecsSinceEpoch();
-    const QStringList before = tokriEntries();
+    const QString basketDir = StandardPaths::getPath(StandardPaths::BasketDir);
+    const QStringList before = basketEntries(basketDir);
 
     const char *consumer = "none";
     bool wrote = false;
@@ -85,9 +85,9 @@ void DropHandler::handleDrop(QMimeData *data)
 
     if (wrote) {
         QStringList added;
-        for (const QString &name : tokriEntries())
+        for (const QString &name : basketEntries(basketDir))
             if (!before.contains(name))
-                added << name;
+                added << QDir(basketDir).filePath(name);
         emit stored(batchKey, added);
 
         log.log() << "emit changed";

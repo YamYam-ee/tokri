@@ -18,8 +18,9 @@ public:
     // Sort key: the batch timestamp (ms) for dropped items, or a small index
     // once the user has reordered the list by hand (so later drops, with
     // timestamp keys, still land below). -1 when unknown.
-    qint64 batchKey(const QString &fileName) const;
-    bool isDelivered(const QString &fileName) const;
+    // All keys are absolute paths (items in different tabs may share a name).
+    qint64 batchKey(const QString &path) const;
+    bool isDelivered(const QString &path) const;
 
 public slots:
     void addBatch(qint64 key, const QStringList &fileNames);
@@ -27,7 +28,10 @@ public slots:
     void setDelivered(const QStringList &fileNames, bool delivered);
     // Pins the given order (top to bottom) as the new sort keys.
     void setManualOrder(const QStringList &fileNames);
-    void rename(const QString &oldName, const QString &newName);
+    void rename(const QString &oldPath, const QString &newPath);
+    // Moves items into another tab's directory (they go to its bottom,
+    // keeping their check marks). Returns the new paths.
+    QStringList moveFiles(const QStringList &paths, const QString &dir);
 
 signals:
     void orderChanged();

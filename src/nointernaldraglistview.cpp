@@ -2,22 +2,26 @@
 
 #include "basketorder.h"
 #include "loghelpers.h"
+#include "standardpaths.h"
 #include "sortfilterproxy.h"
 #include "thumbnaillayout.h"
 
 #include <QDrag>
 #include <QDragEnterEvent>
 #include <QFileInfo>
+#include <QDir>
 #include <QFileSystemModel>
+#include <QMimeData>
 #include <QGuiApplication>
 #include <QMouseEvent>
 #include <QPainter>
 
 namespace {
 
+// BasketOrder key of an item: its absolute path.
 QString nameOf(const QModelIndex &idx)
 {
-    return idx.data(QFileSystemModel::FileInfoRole).value<QFileInfo>().fileName();
+    return idx.data(QFileSystemModel::FileInfoRole).value<QFileInfo>().absoluteFilePath();
 }
 
 void preferCopy(QDropEvent *e)
@@ -163,6 +167,26 @@ void NoInternalDragListView::dropEvent(QDropEvent *e)
         mDroppedOnSelf = true;
         e->setDropAction(Qt::CopyAction);
         e->accept();
+
+        // Dragged from another tab (the tab switched while hovering it):
+        // move the files into this tab.
+        const QString here = QDir(StandardPaths::getPath(StandardPaths::BasketDir))
+                                 .absolutePath();
+        QStringList foreign;
+        const auto urls = e->mimeData()->urls();
+        for (const QUrl &url : urls) {
+            if (!url.isLocalFile())
+                continue;
+            const QString path = QFileInfo(url.toLocalFile()).absoluteFilePath();
+            if (QFileInfo(path).absolutePath().compare(here, Qt::CaseInsensitive) != 0)
+                foreign << path;
+        }
+        if (!foreign.isEmpty()) {
+            BasketOrder::instance().moveFiles(foreign, here);
+            log.pop();
+            return;
+        }
+
         moveSelectionTo(row);
         log.pop();
         return;

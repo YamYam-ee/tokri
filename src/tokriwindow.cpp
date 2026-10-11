@@ -11,6 +11,13 @@
 #include "thumbnaillayout.h"
 #include <QDir>
 #include <QHBoxLayout>
+#include <QInputDialog>
+#include <QLineEdit>
+#include <QMessageBox>
+#include <QSettings>
+#include <QTabBar>
+#include <QToolButton>
+#include <functional>
 #include <QMenu>
 #include <QPushButton>
 #include <QShortcut>
@@ -28,6 +35,100 @@
 #ifdef Q_OS_WIN
 #include <windows.h>
 #endif
+
+namespace {
+
+// "+" next to the tabs: click for a new tab, or drop files on it to put
+// them in a new tab.
+class AddTabButton : public QToolButton
+{
+public:
+    explicit AddTabButton(QWidget *parent) : QToolButton(parent)
+    {
+        setText("+");
+        setAutoRaise(true);
+        setAcceptDrops(true);
+        setFocusPolicy(Qt::NoFocus);
+        setCursor(Qt::PointingHandCursor);
+        setToolTip("Ny flik – eller släpp filer här för att lägga dem i en ny flik");
+        QFont f = font();
+        f.setPointSizeF(f.pointSizeF() * 1.4);
+        f.setBold(true);
+        setFont(f);
+    }
+
+    std::function<void(QDropEvent *)> onDrop;
+
+protected:
+    void dragEnterEvent(QDragEnterEvent *e) override
+    {
+        if (DropAwareFileSystemModel::isPasteable(e->mimeData())) {
+            e->setDropAction(Qt::CopyAction);
+            e->accept();
+            setDown(true);
+        }
+    }
+    void dragMoveEvent(QDragMoveEvent *e) override
+    {
+        e->setDropAction(Qt::CopyAction);
+        e->accept();
+    }
+    void dragLeaveEvent(QDragLeaveEvent *) override { setDown(false); }
+    void dropEvent(QDropEvent *e) override
+    {
+        setDown(false);
+        e->setDropAction(Qt::CopyAction);
+        e->accept();
+        if (onDrop)
+            onDrop(e);
+    }
+};
+
+// In-place editor for a tab's name.
+class TabNameEdit : public QLineEdit
+{
+public:
+    using QLineEdit::QLineEdit;
+    std::function<void(bool accepted)> onDone;
+
+protected:
+    bool event(QEvent *e) override
+    {
+        // Keep Escape/Enter here rather than the window's shortcuts.
+        if (e->type() == QEvent::ShortcutOverride) {
+            const int key = static_cast<QKeyEvent *>(e)->key();
+            if (key == Qt::Key_Escape || key == Qt::Key_Return || key == Qt::Key_Enter) {
+                e->accept();
+                return true;
+            }
+        }
+        return QLineEdit::event(e);
+    }
+    void keyPressEvent(QKeyEvent *e) override
+    {
+        if (e->key() == Qt::Key_Escape) { finish(false); return; }
+        if (e->key() == Qt::Key_Return || e->key() == Qt::Key_Enter) { finish(true); return; }
+        QLineEdit::keyPressEvent(e);
+    }
+    void focusOutEvent(QFocusEvent *e) override
+    {
+        QLineEdit::focusOutEvent(e);
+        finish(true);
+    }
+
+private:
+    void finish(bool accepted)
+    {
+        if (mDone)
+            return;
+        mDone = true;
+        if (onDone)
+            onDone(accepted);
+    }
+    bool mDone = false;
+};
+
+}
 
 TokriWindow::TokriWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -111,6 +212,8 @@ TokriWindow::TokriWindow(QWidget *parent)
     // Kept visible (only disabled when empty) so the window's height math
     // does not shift when the basket empties or fills.
     mBottomBar->setEnabled(false);
+
+    setupTabs();
 
     applyColumnSizing();
 
@@ -403,7 +506,7 @@ void TokriWindow::setSelectionDelivered(bool delivered)
     QStringList names;
     const auto selected = ui->listView->selectionModel()->selectedIndexes();
     for (const QModelIndex &idx : selected)
-        names << idx.data(QFileSystemModel::FileInfoRole).value<QFileInfo>().fileName();
+        names << idx.data(QFileSystemModel::FileInfoRole).value<QFileInfo>().absoluteFilePath();
     BasketOrder::instance().setDelivered(names, delivered);
     if (delivered)
         ui->listView->clearSelection();
@@ -419,6 +522,235 @@ void TokriWindow::clearAll()
     deleteSelection();
 
     log.pop();
+}
+
+QString TokriWindow::tabDir(int id)
+{
+    if (id == 0)
+        return StandardPaths::getPath(StandardPaths::TokriDir);
+    const QString dir = QDir::home().filePath("Tokri-flikar/" + QString::number(id));
+    QDir().mkpath(dir);
+    return QDir(dir).absolutePath();
+}
+
+void TokriWindow::setupTabs()
+{
+    auto *row = new QWidget(ui->centralwidget);
+    auto *h = new QHBoxLayout(row);
+    h->setContentsMargins(0, 0, 0, 0);
+    h->setSpacing(2);
+
+    mTabBar = new QTabBar(row);
+    mTabBar->setDocumentMode(true);
+    mTabBar->setExpanding(false);
+    mTabBar->setMovable(true);
+    mTabBar->setElideMode(Qt::ElideRight);
+    mTabBar->setUsesScrollButtons(true);
+    mTabBar->setFocusPolicy(Qt::NoFocus);
+    // Hovering a tab while dragging switches to it, so files can be dropped
+    // (or moved from another tab) into it.
+    mTabBar->setAcceptDrops(true);
+    mTabBar->setChangeCurrentOnDrag(true);
+    mTabBar->setContextMenuPolicy(Qt::CustomContextMenu);
+    h->addWidget(mTabBar, 1);
+
+    auto *add = new AddTabButton(row);
+    h->addWidget(add);
+    ui->verticalLayout->insertWidget(0, row);
+
+    connect(add, &QToolButton::clicked, this, [this] {
+        renameBasketTab(addBasketTab());
+    });
+    add->onDrop = [this](QDropEvent *e) {
+        const bool internal = e->source() == ui->listView;
+        const QString fromDir = currentBasketDir();
+        const int index = addBasketTab();
+        if (internal) {
+            // Move the dragged items from their tab into the new one.
+            ui->listView->acceptInternalDrop();
+            QStringList paths;
+            const auto urls = e->mimeData()->urls();
+            for (const QUrl &url : urls)
+                if (url.isLocalFile())
+                    paths << QFileInfo(url.toLocalFile()).absoluteFilePath();
+            Q_UNUSED(fromDir);
+            BasketOrder::instance().moveFiles(paths, currentBasketDir());
+        } else {
+            emit dropIntoBasket(e->mimeData());
+        }
+        renameBasketTab(index);
+    };
+
+    // Load tabs (the first, id 0, is the original Tokri folder).
+    QSettings settings;
+    const int n = settings.beginReadArray("tabs");
+    for (int i = 0; i < n; ++i) {
+        settings.setArrayIndex(i);
+        mTabs.append({settings.value("id").toInt(), settings.value("name").toString()});
+    }
+    settings.endArray();
+    if (mTabs.isEmpty())
+        mTabs.append({0, QStringLiteral("Korg")});
+    for (const BasketTab &t : std::as_const(mTabs))
+        mNextTabId = qMax(mNextTabId, t.id + 1);
+
+    {
+        const QSignalBlocker block(mTabBar);
+        for (const BasketTab &t : std::as_const(mTabs))
+            mTabBar->addTab(t.name);
+        mTabBar->setCurrentIndex(
+            qBound(0, settings.value("tabs/current").toInt(), int(mTabs.size()) - 1));
+    }
+    StandardPaths::setBasketDir(currentBasketDir());
+
+    connect(mTabBar, &QTabBar::currentChanged, this, &TokriWindow::onTabChanged);
+    connect(mTabBar, &QTabBar::tabMoved, this, [this](int from, int to) {
+        mTabs.move(from, to);
+        saveTabs();
+    });
+    connect(mTabBar, &QTabBar::tabBarDoubleClicked, this, [this](int index) {
+        if (index < 0)
+            renameBasketTab(addBasketTab());
+        else
+            renameBasketTab(index);
+    });
+    connect(mTabBar, &QWidget::customContextMenuRequested, this,
+            [this](const QPoint &pos) {
+                const int index = mTabBar->tabAt(pos);
+                QMenu menu;
+                menu.setPalette(palette());
+                QAction *rename = nullptr, *remove = nullptr;
+                if (index >= 0)
+                    rename = menu.addAction("Byt namn");
+                QAction *add = menu.addAction("Ny flik");
+                if (index >= 0) {
+                    menu.addSeparator();
+                    remove = menu.addAction("Ta bort flik");
+                    remove->setEnabled(mTabs.size() > 1);
+                }
+                QAction *chosen = menu.exec(mTabBar->mapToGlobal(pos));
+                if (!chosen)
+                    return;
+                if (chosen == rename)
+                    renameBasketTab(index);
+                else if (chosen == add)
+                    renameBasketTab(addBasketTab());
+                else if (chosen == remove)
+                    removeBasketTab(index);
+            });
+}
+
+void TokriWindow::initTabs()
+{
+    emit basketDirChanged(currentBasketDir());
+}
+
+QString TokriWindow::currentBasketDir() const
+{
+    const int i = mTabBar ? mTabBar->currentIndex() : 0;
+    return tabDir(i >= 0 && i < mTabs.size() ? mTabs[i].id : 0);
+}
+
+void TokriWindow::saveTabs() const
+{
+    QSettings settings;
+    settings.beginWriteArray("tabs", int(mTabs.size()));
+    for (int i = 0; i < mTabs.size(); ++i) {
+        settings.setArrayIndex(i);
+        settings.setValue("id", mTabs[i].id);
+        settings.setValue("name", mTabs[i].name);
+    }
+    settings.endArray();
+    settings.setValue("tabs/current", mTabBar->currentIndex());
+}
+
+void TokriWindow::onTabChanged(int index)
+{
+    if (index < 0)
+        return;
+    if (mPreview)
+        mPreview->close();
+    ui->listView->setPreviewStart(QModelIndex());
+    ui->listView->clearSelection();
+
+    const QString dir = currentBasketDir();
+    StandardPaths::setBasketDir(dir);
+    saveTabs();
+    emit basketDirChanged(dir);
+}
+
+int TokriWindow::addBasketTab(const QString &name)
+{
+    const int id = mNextTabId++;
+    const QString title = name.isEmpty()
+        ? QStringLiteral("Flik %1").arg(mTabs.size() + 1)
+        : name;
+    mTabs.append({id, title});
+    tabDir(id); // create the folder
+    const int index = mTabBar->addTab(title);
+    mTabBar->setCurrentIndex(index); // switches (onTabChanged saves)
+    saveTabs();
+    return index;
+}
+
+void TokriWindow::renameBasketTab(int index)
+{
+    if (index < 0 || index >= mTabs.size())
+        return;
+    mTabBar->setCurrentIndex(index);
+
+    auto *edit = new TabNameEdit(mTabBar);
+    edit->setText(mTabs[index].name);
+    edit->selectAll();
+    QRect r = mTabBar->tabRect(index).adjusted(2, 2, -2, -2);
+    r.setWidth(qMax(r.width(), 120));
+    edit->setGeometry(r);
+    edit->show();
+    edit->setFocus();
+
+    const int id = mTabs[index].id;
+    edit->onDone = [this, edit, id](bool accepted) {
+        const QString name = edit->text().trimmed();
+        if (accepted && !name.isEmpty()) {
+            for (int i = 0; i < mTabs.size(); ++i) {
+                if (mTabs[i].id == id) {
+                    mTabs[i].name = name;
+                    mTabBar->setTabText(i, name);
+                }
+            }
+            saveTabs();
+        }
+        edit->deleteLater();
+        ui->listView->setFocus();
+    };
+}
+
+void TokriWindow::removeBasketTab(int index)
+{
+    if (index < 0 || index >= mTabs.size() || mTabs.size() <= 1)
+        return;
+
+    const BasketTab tab = mTabs[index];
+    const QString dir = tabDir(tab.id);
+    const QFileInfoList items = QDir(dir).entryInfoList(
+        QDir::AllEntries | QDir::NoDotAndDotDot | QDir::Hidden);
+
+    if (!items.isEmpty()) {
+        const auto answer = QMessageBox::question(
+            this, "Ta bort flik",
+            QStringLiteral("Ta bort fliken \"%1\"?\n\n%2 fil(er) i den flyttas till papperskorgen.")
+                .arg(tab.name).arg(items.size()));
+        if (answer != QMessageBox::Yes)
+            return;
+    }
+    for (const QFileInfo &fi : items)
+        QFile::moveToTrash(fi.absoluteFilePath());
+    if (tab.id != 0)
+        QDir(dir).removeRecursively();
+
+    mTabs.removeAt(index);
+    mTabBar->removeTab(index); // switches tab if it was current
+    saveTabs();
 }
 
 void TokriWindow::fitHeightToContents()

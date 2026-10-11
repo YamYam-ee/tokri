@@ -17,7 +17,7 @@ QVariant FSSortFilterProxy::data(const QModelIndex &index, int role) const
     if (role == DeliveredRole) {
         const QFileInfo fi =
             index.data(QFileSystemModel::FileInfoRole).value<QFileInfo>();
-        return BasketOrder::instance().isDelivered(fi.fileName());
+        return BasketOrder::instance().isDelivered(fi.absoluteFilePath());
     }
     return QSortFilterProxyModel::data(index, role);
 }
@@ -43,7 +43,7 @@ bool FSSortFilterProxy::lessThan(const QModelIndex &left, const QModelIndex &rig
     // they were dropped, and each batch is sorted by name ("2" before "10").
     // Items without a recorded batch fall back to their creation time.
     const auto key = [](const QFileInfo &fi) {
-        const qint64 batch = BasketOrder::instance().batchKey(fi.fileName());
+        const qint64 batch = BasketOrder::instance().batchKey(fi.absoluteFilePath());
         return batch >= 0 ? batch : fi.birthTime().toMSecsSinceEpoch();
     };
     const qint64 l = key(leftFileInfo);

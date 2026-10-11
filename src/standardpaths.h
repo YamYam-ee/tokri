@@ -8,6 +8,7 @@ class StandardPaths
 public:
     enum Paths {
         TokriDir,
+        BasketDir,      // directory of the current tab (drops land here)
         LinuxApplicationDir,
         LinuxIconsDir
     };
@@ -15,6 +16,7 @@ public:
     StandardPaths();
 
     static QString getPath(Paths path);
+    static void setBasketDir(const QString &dir);
 };
 
 #endif // STANDARDPATHS_H

@@ -17,8 +17,8 @@ public slots:
 
 signals:
     void changed();
-    // Names (in the Tokri directory) of everything one drop added, with the
-    // drop's timestamp as batch key.
+    // Paths of everything one drop added, with the drop's timestamp as
+    // batch key.
     void stored(qint64 batchKey, const QStringList &fileNames);
     void failed(const QString &reason);
 

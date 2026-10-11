@@ -260,6 +260,24 @@ int main(int argc, char *argv[])
     tokriWindow.uiHandle()->listView->setRootIndex(sortFilterProxy->mapFromSource(
         thumbnailProxy->mapFromSource(rootIndex)));
 
+    // Tabs: switching tab re-roots the list on that tab's folder.
+    QObject::connect(&tokriWindow, &TokriWindow::basketDirChanged, listView,
+                     [&tokriWindow, fsModel, thumbnailProxy, sortFilterProxy,
+                      listView](const QString &dir) {
+                         const QModelIndex src = fsModel->setRootPath(dir);
+                         listView->setRootIndex(sortFilterProxy->mapFromSource(
+                             thumbnailProxy->mapFromSource(src)));
+                         sortFilterProxy->invalidate();
+                         tokriWindow.updateCounter();
+                         tokriWindow.fitHeightToContents();
+                     });
+    QObject::connect(&tokriWindow, &TokriWindow::dropIntoBasket, fsModel,
+                     [fsModel](const QMimeData *data) {
+                         fsModel->dropMimeData(data, Qt::CopyAction, -1, -1,
+                                               QModelIndex());
+                     });
+    tokriWindow.initTabs();
+
     const auto updateSelectionActions =
         [copyAction, deleteAction, openAction, renameAction](int count) {
             copyAction->setEnabled(count > 0);
@@ -288,10 +306,11 @@ int main(int argc, char *argv[])
                          tokriWindow.updateCounter();
                      });
     QObject::connect(fsModel, &QFileSystemModel::fileRenamed,
-                     &basketOrder, [&basketOrder](const QString &,
+                     &basketOrder, [&basketOrder](const QString &dir,
                                                   const QString &oldName,
                                                   const QString &newName) {
-                         basketOrder.rename(oldName, newName);
+                         basketOrder.rename(QDir(dir).filePath(oldName),
+                                            QDir(dir).filePath(newName));
                      });
     // New items land at the bottom; grow the window and bring them into view.
     const auto fitAndScroll = [&tokriWindow, listView] {
