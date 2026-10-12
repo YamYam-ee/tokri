@@ -206,6 +206,15 @@ kbd {
   font: 600 11px/1.1 var(--f-body); text-align: center; background: rgba(255, 216, 77, .08);
 }
 
+.pill {
+  position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%);
+  display: flex; align-items: center; border-radius: 999px; background: rgba(46, 160, 67, .88);
+  color: #fff; font: 700 12px/1 "Segoe UI", var(--f-body); white-space: nowrap;
+}
+.pill .grip { padding: 10px 12px 10px 16px; border-right: 1px solid rgba(255, 255, 255, .35); }
+.pill .state { padding: 10px 16px 10px 10px; display: flex; align-items: center; gap: 6px; }
+.pill svg { width: 14px; height: 14px; color: #fff; }
+
 .flow { display: grid; gap: 12px; }
 .arrow-down { text-align: center; color: var(--muted); font: 600 0.85rem var(--f-body); }
 .arrow-down svg { width: 22px; height: 22px; display: block; margin: 0 auto 2px; color: var(--accent); }
@@ -454,6 +463,7 @@ footer a { color: var(--accent); }
       <li>När du stänger är filen du tittade på sist markerad. Raden där du började får en tonad markering.</li>
       <li>PDF och bilder visas med zoom. Word, Excel och Outlook-mejl visas med Windows egen förhandsvisare.</li>
     </ul>
+    <p><strong>Leverera direkt från förhandsvisningen:</strong> rutan längst ner visar om filen är avbockad. Den är grön med en bock när filen är levererad. Greppa <em>Dra ut</em> och dra filen till ett mejl, en mapp eller skrivbordet, så bockas den av. Ett klick på bocken växlar. Gå sedan vidare till nästa fil med pilen.</p>
     <p class="note"><kbd>+</kbd> och <kbd>−</kbd> zoomar också, piltangenterna och <kbd>PgUp</kbd>/<kbd>PgDn</kbd> flyttar, och <kbd>Home</kbd> visar hela sidbredden igen.</p>
   </div>
   <figure>
@@ -464,9 +474,10 @@ footer a { color: var(--accent); }
         <div class="navbtn l"><svg><use href="#i-chev-l"/></svg></div>
         <div class="navbtn r"><svg><use href="#i-chev-r"/></svg><span class="pin" style="left:-10px;top:-10px">2</span></div>
         <div class="zoomring">scrolla<br>= zooma<br>här<span class="pin" style="right:-10px;top:-10px">1</span></div>
+        <div class="pill"><span class="grip">⠿ ▯ Dra ut</span><span class="state"><svg><use href="#i-tick"/></svg>Avbockad</span><span class="pin" style="right:-8px;top:-10px">3</span></div>
       </div>
     </div>
-    <figcaption><b>1</b> Zoomen följer muspekaren. <b>2</b> Pilen till höger hovras och syns tydligt. Den vänstra är nästan genomskinlig.</figcaption>
+    <figcaption><b>1</b> Zoomen följer muspekaren. <b>2</b> Pilen till höger hovras och syns tydligt. Den vänstra är nästan genomskinlig. <b>3</b> Statusrutan: dra ut filen från vänstra delen. Rutan är grön eftersom filen redan är avbockad.</figcaption>
   </figure>
 </section>
 

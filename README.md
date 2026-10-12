@@ -48,6 +48,7 @@ Windows. Originalets README finns i [docs/UPSTREAM-README.md](docs/UPSTREAM-READ
 - PDF och bilder: zooma med scrollhjulet där muspekaren är, dra för att flytta
 - Word, Excel, Outlook-mejl m.m. via Windows egna förhandsvisare
 - Stora genomskinliga pilar för föregående/nästa; klick i bilden stänger
+- Statusruta som visar om filen är avbockad; dra ut filen direkt därifrån
 
 **PDF**
 - Markera flera PDF:er → högerklick → **Slå ihop** – de sätts ihop i
